@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaming Backlog Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --fg-primary: #e8e8ec;
+            --fg-muted: #6b6b7b;
+            --accent: #00ff88;
+            --accent-dim: #00cc6a;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --border: #2a2a3a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            min-height: 100vh;
+        }
+
+        .font-display { font-family: 'Orbitron', sans-serif; }
+
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .glow-orb {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb-1 { background: var(--accent); top: -200px; right: -200px; }
+        .orb-2 { background: #ff6b35; bottom: -300px; left: -200px; }
+
+        /* Login Screen */
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--fg-muted);
+            text-align: center;
+        }
+
+        .auth-tab.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        /* User Bar */
+        .user-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #00ffcc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--bg-primary);
+            font-size: 14px;
+        }
+
+        /* Game Card */
+        .game-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .game-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--accent);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 255, 136, 0.1);
+        }
+
+        .game-card .cover {
+            width: 100%;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .game-card:hover .cover { transform: scale(1.05); }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status-jogando { background: rgba(0, 255, 136, 0.85); color: #000; }
+        .status-zeradasso { background: rgba(255, 215, 0, 0.9); color: #000; }
+        .status-historia { background: rgba(100, 149, 237, 0.9); color: #fff; }
+        .status-voltarei { background: rgba(255, 165, 2, 0.9); color: #000; }
+        .status-dropei { background: rgba(255, 71, 87, 0.9); color: #fff; }
+        .status-nao { background: rgba(107, 107, 123, 0.9); color: #fff; }
+
+        .platform-display { display: flex; align-items: center; gap: 6px; }
+        .platform-icon { width: 16px; height: 16px; object-fit: contain; border-radius: 2px; }
+
+        .rating { display: flex; gap: 2px; align-items: center; }
+        .rating-bar { height: 4px; border-radius: 2px; background: var(--border); flex: 1; overflow: hidden; }
+        .rating-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00ffcc); transition: width 0.5s ease; }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
+
+        .form-input {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--fg-primary);
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b6b7b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary { background: var(--accent); color: var(--bg-primary); }
+        .btn-primary:hover { background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 255, 136, 0.3); }
+
+        .btn-secondary { background: var(--bg-card); color: var(--fg-primary); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--fg-muted); }
+
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #ff6b7a; }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--fg-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), transparent);
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--fg-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .filter-chip:hover { border-color: var(--accent); color: var(--fg-primary); }
+        .filter-chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in { animation: fadeInUp 0.5s ease forwards; }
+        .stagger-1 { animation-delay: 0.1s; }
+        .stagger-2 { animation-delay: 0.2s; }
+        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-4 { animation-delay: 0.4s; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+
+        .cover-upload {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+        }
+        .cover-upload:hover { border-color: var(--accent); background: rgba(0, 255, 136, 0.05); }
+        .cover-preview { max-width: 150px; border-radius: 8px; margin: 0 auto; }
+        .cover-tab {
+            display: inline-block;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 6px;
+            background: var(--bg-card);
+            margin-right: 8px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .cover-tab.active { background: var(--accent); color: #000; font-weight: 600; }
+        .cover-input-group { display: none; }
+        .cover-input-group.active { display: block; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 24px;
+            z-index: 200;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: var(--accent); }
+        .toast.error { border-color: var(--danger); }
+
+        .settings-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .config-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .config-item:last-child { margin-bottom: 0; }
+
+        .config-delete-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--fg-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .config-delete-btn:hover {
+            background: rgba(255, 71, 87, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .add-item-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .add-item-row input { flex: 1; min-width: 120px; }
+
+        .config-item-icon {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            margin-right: 10px;
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-grid">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <!-- Tela de Login/Registro -->
+    <div id="auth-screen" class="auth-container hidden">
+        <div class="auth-box animate-in">
+            <h1 class="font-display text-2xl font-bold text-center mb-2" style="color: var(--accent);">GAMING BACKLOG</h1>
+            <p class="text-center text-sm mb-6" style="color: var(--fg-muted);">Acesse sua conta para sincronizar</p>
+            
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</div>
+                <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Criar Conta</div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="space-y-4" onsubmit="handleLogin(event)">
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Senha</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="Sua senha" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Entrar</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="space-y-4 hidden" onsubmit="handleRegister(event)">
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Email</label>
+                    <input type="email" id="register-email" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Senha (minimo 6 caracteres)</label>
+                    <input type="password" id="register-password" class="form-input" placeholder="Crie uma senha" required minlength="6">
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Criar Conta</button>
+            </form>
+
+            <p class="text-xs text-center mt-4" style="color: var(--fg-muted);">Dados salvos na nuvem via Firebase</p>
+        </div>
+    </div>
+
+    <!-- App Principal -->
+    <div id="app-screen" class="relative z-10 max-w-7xl mx-auto px-4 py-8 hidden">
+        <!-- User Bar -->
+        <div class="user-bar animate-in">
+            <div class="user-info">
+                <div class="user-avatar" id="user-avatar">?</div>
+                <div>
+                    <p class="font-medium" id="user-name">Usuario</p>
+                    <p class="text-xs" style="color: var(--fg-muted);">Sincronizado na nuvem</p>
+                </div>
+            </div>
+            <button onclick="handleLogout()" class="btn btn-secondary text-sm" style="padding: 8px 16px;">Sair</button>
+        </div>
+
+        <!-- Header -->
+        <header class="mb-8 animate-in">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="font-display text-3xl md:text-4xl font-bold tracking-wider" style="color: var(--accent);">GAMING BACKLOG</h1>
+                    <p class="text-sm mt-2" style="color: var(--fg-muted);">Clique em um jogo para editar ou excluir</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="openSettingsModal()" class="btn btn-secondary flex items-center gap-2" title="Configuracoes">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Config</span>
+                    </button>
+                    <button onclick="openModal()" class="btn btn-primary flex items-center gap-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Adicionar Jogo
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Section -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 animate-in stagger-1">
+            <div class="stat-card">
+                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Total de Jogos</p>
+                <p class="font-display text-2xl font-bold" id="stat-total">0</p>
+            </div>
+            <div class="stat-card">
+                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Horas Jogadas</p>
+                <p class="font-display text-2xl font-bold" style="color: var(--accent);" id="stat-hours">0</p>
+            </div>
+            <div class="stat-card">
+                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Zerados</p>
+                <p class="font-display text-2xl font-bold" style="color: #ffd700;" id="stat-completed">0</p>
+            </div>
+            <div class="stat-card">
+                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Historia Completa</p>
+                <p class="font-display text-2xl font-bold" style="color: #6495ed;" id="stat-story">0</p>
+            </div>
+            <div class="stat-card">
+                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Jogando</p>
+                <p class="font-display text-2xl font-bold" style="color: #00ff88;" id="stat-playing">0</p>
+            </div>
+        </section>
+
+        <!-- Filters -->
+        <section class="mb-6 animate-in stagger-2">
+            <div class="flex flex-wrap gap-3 items-center" id="filter-container">
+                <span class="text-sm font-medium" style="color: var(--fg-muted);">Filtrar:</span>
+                <button class="filter-chip active" data-filter="all">Todos</button>
+            </div>
+        </section>
+
+        <!-- Search -->
+        <section class="mb-6 animate-in stagger-3">
+            <div class="relative max-w-md">
+                <svg class="absolute left-4 top-1/2 -translate-y-1/2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" id="search-input" placeholder="Buscar jogos..." class="form-input pl-12">
+            </div>
+        </section>
+
+        <!-- Games Grid -->
+        <section id="games-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-in stagger-4"></section>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16">
+            <svg class="mx-auto mb-4" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="1">
+                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                <path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
+            </svg>
+            <p class="text-lg" style="color: var(--fg-muted);">Nenhum jogo encontrado</p>
+            <p class="text-sm mt-2" style="color: var(--fg-muted);">Adicione jogos ao seu backlog!</p>
+        </div>
+    </div>
+
+    <!-- Game Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-display text-xl font-bold" id="modal-title">Adicionar Jogo</h2>
+                    <button onclick="closeModal()" class="btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="game-form" class="space-y-4">
+                    <input type="hidden" id="game-id">
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Capa do Jogo</label>
+                        <div class="mb-2">
+                            <span class="cover-tab active" onclick="switchCoverInput('url')">Link URL</span>
+                            <span class="cover-tab" onclick="switchCoverInput('file')">Upload Arquivo</span>
+                        </div>
+                        
+                        <div id="cover-url-group" class="cover-input-group active">
+                            <input type="url" id="game-cover-url" class="form-input" placeholder="https://exemplo.com/imagem.jpg">
+                        </div>
+
+                        <div id="cover-file-group" class="cover-input-group">
+                            <div class="cover-upload" onclick="document.getElementById('cover-input').click()">
+                                <input type="file" id="cover-input" accept="image/*" class="hidden" onchange="handleCoverUpload(event)">
+                                <div id="cover-placeholder">
+                                    <svg class="mx-auto mb-2" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="1.5">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <path d="M21 15l-5-5L5 21"/>
+                                    </svg>
+                                    <p class="text-sm" style="color: var(--fg-muted);">Clique para fazer upload</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="cover-preview-container" class="hidden mt-3 p-3 rounded-lg" style="background: var(--bg-card); text-align: center;">
+                            <img id="cover-preview" class="cover-preview" alt="Preview">
+                            <button type="button" onclick="clearCoverPreview()" class="text-xs mt-2 text-red-400 hover:text-red-300">Remover Imagem</button>
+                        </div>
+                        <input type="hidden" id="game-cover">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Nome do Jogo</label>
+                        <input type="text" id="game-name" class="form-input" placeholder="Ex: Dark Souls" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Genero</label>
+                        <select id="game-genre" class="form-input form-select" required></select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Plataforma</label>
+                        <select id="game-platform" class="form-input form-select" required></select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Status</label>
+                        <select id="game-status" class="form-input form-select" required></select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Horas Jogadas</label>
+                        <input type="number" id="game-hours" class="form-input" placeholder="Ex: 50" min="0">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Avaliacao (1-10)</label>
+                        <div class="flex gap-2">
+                            <input type="range" id="game-rating" class="flex-1" min="1" max="10" value="5">
+                            <span id="rating-display" class="font-display font-bold w-8 text-center" style="color: var(--accent);">5</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Data de Lancamento</label>
+                        <input type="date" id="game-release" class="form-input">
+                    </div>
+
+                    <div class="flex flex-col gap-3 pt-4">
+                        <div class="flex gap-3">
+                            <button type="button" onclick="closeModal()" class="btn btn-secondary flex-1">Cancelar</button>
+                            <button type="submit" class="btn btn-primary flex-1">Salvar</button>
+                        </div>
+                        <button type="button" id="delete-btn" onclick="deleteGameFromModal()" class="btn btn-danger w-full hidden">Excluir Jogo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-display text-xl font-bold">Configuracoes</h2>
+                    <button onclick="closeSettingsModal()" class="btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <p class="text-sm mb-6" style="color: var(--fg-muted);">Gerencie as opcoes disponiveis nos formularios de jogos.</p>
+
+                <!-- Generos -->
+                <div class="settings-section">
+                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">GENROS</h3>
+                    <div id="genre-list"></div>
+                    <div class="add-item-row">
+                        <input type="text" id="new-genre" class="form-input" placeholder="Novo genero...">
+                        <button onclick="addConfigItem('genres', 'new-genre')" class="btn btn-primary" style="padding: 12px 16px;">Adicionar</button>
+                    </div>
+                </div>
+
+                <!-- Plataformas -->
+                <div class="settings-section">
+                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">PLATAFORMAS</h3>
+                    <div id="platform-list"></div>
+                    <div class="add-item-row">
+                        <input type="text" id="new-platform-name" class="form-input" placeholder="Nome (ex: PC (Steam))">
+                        <input type="text" id="new-platform-icon" class="form-input" placeholder="URL do Icone (opcional)">
+                        <button onclick="addPlatform()" class="btn btn-primary" style="padding: 12px 16px;">Salvar</button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="settings-section">
+                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">STATUS</h3>
+                    <div id="status-list"></div>
+                    <div class="add-item-row">
+                        <input type="text" id="new-status" class="form-input" placeholder="Novo status...">
+                        <button onclick="addConfigItem('statuses', 'new-status')" class="btn btn-primary" style="padding: 12px 16px;">Adicionar</button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end mt-6">
+                    <button onclick="closeSettingsModal()" class="btn btn-primary">Concluido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style="background: rgba(255, 71, 87, 0.1);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/>
+                        <line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                </div>
+                <h3 class="font-display text-lg font-bold mb-2">Excluir Jogo</h3>
+                <p class="text-sm mb-6" style="color: var(--fg-muted);">Tem certeza que deseja excluir este jogo? Esta acao nao pode ser desfeita.</p>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteModal()" class="btn btn-secondary flex-1">Cancelar</button>
+                    <button onclick="confirmDelete()" class="btn btn-danger flex-1">Excluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><p id="toast-message"></p></div>
+
+    <script>
+        // ==================== COLE SUA CONFIGURACAO DO FIREBASE AQUI ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCL6mxp6RY4IR5vH6FKG67KAlZAi_fmjIM",
+            authDomain: "gaming-backlog-g.firebaseapp.com",
+            projectId: "gaming-backlog-g",
+            storageBucket: "gaming-backlog-g.firebasestorage.app",
+            messagingSenderId: "462908123438",
+            appId: "1:462908123438:web:3c7c714c9c2bc32d9672bf"
+        };
+        // ==================================================================================
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Default configuration
+        const defaultConfig = {
+            genres: [
+                'Acao/Aventura RPG', 'Soulslike', 'Hack n Slash', 'RPG de Turno',
+                'Acao/Aventura FPS', 'Plataforma Terror', 'Plataforma Acao/Aventura',
+                'Corrida', 'Simulacao', 'Historia'
+            ],
+            platforms: [
+                { name: 'PC (Steam)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/1024px-Steam_icon_logo.svg.png' },
+                { name: 'PC (Epic Games)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/1024px-Epic_Games_logo.svg.png' },
+                { name: 'PC (GOG)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/GOG_logo.svg/1024px-GOG_logo.svg.png' },
+                { name: 'PC (Hydra)', icon: '' },
+                { name: 'PC (Ubisoft)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Ubisoft_logo.svg/1024px-Ubisoft_logo.svg.png' },
+                { name: 'Xbox 360', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/1024px-Xbox_360_logo.svg.png' },
+                { name: 'Playstation 2', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/PlayStation_2_logo.svg/1024px-PlayStation_2_logo.svg.png' }
+            ],
+            statuses: [
+                'Nao Jogado', 'Jogando', 'Voltarei Para Zerar', 'Historia Completa',
+                'Zeradasso', 'Dropei mas Voltarei', 'Dropei desta Merda', 'Passatempo'
+            ]
+        };
+
+        const initialGames = [
+            { id: 1, name: "Dark Souls", cover: "https://assets.nuuvem.com/image/upload/t_boxshot_big/v1/products/5b0467082a1c6e250aceff3f/boxshots/z028ub36xwlti8i8uye7.jpg", genre: "Soulslike", platform: "PC (Steam)", status: "Jogando", hours: null, rating: null, release: "2011-09-22" },
+            { id: 2, name: "Assassin's Creed Chronicles China", cover: "https://cdn1.epicgames.com/offer/f8c4ac7957164721802514c6fc99e66d/ACCC_StorePortrait_1200x1600_1200x1600-ad2c7ccbe4913a324078692b9492e3eb", genre: "Plataforma Acao/Aventura", platform: "PC (Ubisoft)", status: "Historia Completa", hours: null, rating: 3, release: "2015-04-21" },
+            { id: 3, name: "Assassin's Creed Valhalla", cover: "https://upload.wikimedia.org/wikipedia/pt/e/e9/Assassins_Creed_Valhalla_capa.png", genre: "Acao/Aventura RPG", platform: "PC (Ubisoft)", status: "Dropei mas Voltarei", hours: 70, rating: null, release: "2020-11-10" },
+            { id: 4, name: "Black Myth Wukong", cover: "https://cdn1.epicgames.com/spt-assets/ca9ef1bcf2f54043baac351366aec677/black-myth-wukong-jjjfw.png", genre: "Hack n Slash", platform: "PC (Steam)", status: "Voltarei Para Zerar", hours: 168, rating: 8, release: "2024-08-20" },
+            { id: 5, name: "Clair Obscure: Expedition 33", cover: "https://i.scdn.co/image/ab67616d0000b2736e2563012d66edb8f5ba4086", genre: "RPG de Turno", platform: "PC (Hydra)", status: "Voltarei Para Zerar", hours: 28, rating: 9, release: "2025-04-24" },
+            { id: 6, name: "Far Cry 3", cover: "https://upload.wikimedia.org/wikipedia/pt/5/59/Far_cry_3_box_art.jpg", genre: "Acao/Aventura FPS", platform: "PC (Ubisoft)", status: "Voltarei Para Zerar", hours: null, rating: 7, release: "2012-11-29" },
+            { id: 7, name: "Ghost of Tsushima", cover: "https://cdn1.epicgames.com/offer/6e6aa039c73347b885803de65ac5d3db/EGS_GhostofTsushima_SuckerPunchProductions_S2_1200x1600-e23e02c1d70be7b528dba50860f87d39", genre: "Acao/Aventura RPG", platform: "PC (Hydra)", status: "Zeradasso", hours: 45, rating: 7, release: "2020-07-17" },
+            { id: 8, name: "Little Nightmares", cover: "https://m.media-amazon.com/images/I/91HQ+aAlwTL._UF1000,1000_QL80_.jpg", genre: "Plataforma Terror", platform: "PC (Hydra)", status: "Historia Completa", hours: 9, rating: 5, release: "2017-04-28" },
+            { id: 9, name: "Red Dead Redemption", cover: "https://upload.wikimedia.org/wikipedia/pt/f/f3/Red_Dead_Redemption_capa.png", genre: "Acao/Aventura RPG", platform: "PC (Hydra)", status: "Historia Completa", hours: null, rating: 8, release: "2010-05-18" },
+            { id: 10, name: "Red Dead Redemption II", cover: "https://image.api.playstation.com/gs2-sec/appkgo/prod/CUSA08519_00/12/i_3da1cf7c41dc7652f9b639e1680d96436773658668c7dc3930c441291095713b/i/icon0.png", genre: "Acao/Aventura RPG", platform: "PC (Steam)", status: "Voltarei Para Zerar", hours: 266, rating: 10, release: "2018-10-26" },
+            { id: 11, name: "The Witcher: Enhanced Edition", cover: "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co7mue.jpg", genre: "Acao/Aventura RPG", platform: "PC (Steam)", status: "Zeradasso", hours: 77, rating: 6, release: "2007-10-26" }
+        ];
+
+        // State
+        let games = [];
+        let config = { genres: [], platforms: [], statuses: [] };
+        let currentFilter = 'all';
+        let searchQuery = '';
+        let deleteGameId = null;
+        let currentUser = null;
+        let unsubscribers = [];
+
+        // ==================== AUTH FUNCTIONS ====================
+
+        function switchAuthTab(tab) {
+            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => showToast('Login realizado!', 'success'))
+                .catch(err => showToast('Erro: ' + translateError(err.code), 'error'));
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+
+            auth.createUserWithEmailAndPassword(email, password)
+                .then(() => showToast('Conta criada com sucesso!', 'success'))
+                .catch(err => showToast('Erro: ' + translateError(err.code), 'error'));
+        }
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        function translateError(code) {
+            const errors = {
+                'auth/email-already-in-use': 'Este email ja esta em uso',
+                'auth/invalid-email': 'Email invalido',
+                'auth/weak-password': 'Senha muito fraca (minimo 6 caracteres)',
+                'auth/user-not-found': 'Usuario nao encontrado',
+                'auth/wrong-password': 'Senha incorreta'
+            };
+            return errors[code] || code;
+        }
+
+        // Auth State Observer
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                showApp();
+                loadData();
+            } else {
+                currentUser = null;
+                showAuth();
+                cleanupListeners();
+            }
+        });
+
+        function showAuth() {
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('app-screen').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            
+            const email = currentUser.email;
+            const initial = email.charAt(0).toUpperCase();
+            document.getElementById('user-avatar').textContent = initial;
+            document.getElementById('user-name').textContent = email.split('@')[0];
+        }
+
+        function cleanupListeners() {
+            unsubscribers.forEach(unsub => unsub());
+            unsubscribers = [];
+        }
+
+        // ==================== DATA FUNCTIONS ====================
+
+        function loadData() {
+            const userRef = db.collection('users').doc(currentUser.uid);
+
+            // Listen for games changes
+            const unsubGames = userRef.collection('games').onSnapshot(snapshot => {
+                games = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderGames();
+                updateStats();
+            }, err => console.error('Error loading games:', err));
+            unsubscribers.push(unsubGames);
+
+            // Listen for config changes
+            const unsubConfig = userRef.collection('config').doc('main').onSnapshot(doc => {
+                if (doc.exists) {
+                    config = doc.data();
+                } else {
+                    config = JSON.parse(JSON.stringify(defaultConfig));
+                    userRef.collection('config').doc('main').set(config);
+                }
+                populateSelects();
+                renderFilterChips();
+            }, err => console.error('Error loading config:', err));
+            unsubscribers.push(unsubConfig);
+        }
+
+        function saveGame(gameData) {
+            const ref = db.collection('users').doc(currentUser.uid).collection('games');
+            
+            if (gameData.id && typeof gameData.id === 'string') {
+                // Update existing
+                ref.doc(gameData.id).update(gameData);
+            } else {
+                // Create new
+                ref.add(gameData);
+            }
+        }
+
+        function deleteGame(id) {
+            db.collection('users').doc(currentUser.uid).collection('games').doc(id).delete();
+        }
+
+        function saveConfig() {
+            db.collection('users').doc(currentUser.uid).collection('config').doc('main').set(config);
+        }
+
+        // ==================== UI FUNCTIONS ====================
+
+        function populateSelects() {
+            const genreSelect = document.getElementById('game-genre');
+            const platformSelect = document.getElementById('game-platform');
+            const statusSelect = document.getElementById('game-status');
+
+            genreSelect.innerHTML = '<option value="">Selecione...</option>' + 
+                config.genres.map(g => `<option value="${g}">${g}</option>`).join('');
+
+            platformSelect.innerHTML = '<option value="">Selecione...</option>' + 
+                config.platforms.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+
+            statusSelect.innerHTML = '<option value="">Selecione...</option>' + 
+                config.statuses.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+
+        function renderFilterChips() {
+            const container = document.getElementById('filter-container');
+            const chipsHTML = config.statuses.map(status => 
+                `<button class="filter-chip" data-filter="${status}">${status}</button>`
+            ).join('');
+            
+            container.innerHTML = `
+                <span class="text-sm font-medium" style="color: var(--fg-muted);">Filtrar:</span>
+                <button class="filter-chip active" data-filter="all">Todos</button>
+                ${chipsHTML}
+            `;
+
+            container.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    currentFilter = chip.dataset.filter;
+                    renderGames();
+                });
+            });
+        }
+
+        // Setup event listeners
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase();
+            renderGames();
+        });
+
+        document.getElementById('game-rating').addEventListener('input', (e) => {
+            document.getElementById('rating-display').textContent = e.target.value;
+        });
+
+        document.getElementById('game-form').addEventListener('submit', handleFormSubmit);
+
+        ['modal', 'settings-modal', 'delete-modal'].forEach(id => {
+            document.getElementById(id).addEventListener('click', (e) => {
+                if (e.target.id === id) {
+                    if (id === 'modal') closeModal();
+                    else if (id === 'settings-modal') closeSettingsModal();
+                    else closeDeleteModal();
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeSettingsModal();
+                closeDeleteModal();
+            }
+        });
+
+        function getFilteredGames() {
+            return games.filter(game => {
+                const matchesFilter = currentFilter === 'all' || game.status === currentFilter;
+                const matchesSearch = game.name.toLowerCase().includes(searchQuery);
+                return matchesFilter && matchesSearch;
+            });
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('games-grid');
+            const emptyState = document.getElementById('empty-state');
+            const filteredGames = getFilteredGames();
+
+            if (filteredGames.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = filteredGames.map((game, index) => createGameCard(game, index)).join('');
+
+            grid.querySelectorAll('.game-card').forEach((card, i) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, i * 50);
+            });
+        }
+
+        function getPlatformData(platformName) {
+            return config.platforms.find(p => p.name === platformName) || { name: platformName, icon: '' };
+        }
+
+        function createGameCard(game, index) {
+            const statusClass = getStatusClass(game.status);
+            const ratingWidth = game.rating ? game.rating * 10 : 0;
+            const hoursDisplay = game.hours ? `${game.hours}h` : '--';
+            const platformData = getPlatformData(game.platform);
+            
+            let platformHtml = `<div class="platform-display">`;
+            if (platformData.icon) {
+                platformHtml += `<img src="${platformData.icon}" class="platform-icon" onerror="this.style.display='none'">`;
+            }
+            platformHtml += `<span>${game.platform}</span></div>`;
+
+            return `
+                <div class="game-card" data-id="${game.id}" onclick="editGame('${game.id}')">
+                    <div class="relative overflow-hidden">
+                        <img src="${game.cover}" alt="${game.name}" class="cover" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 400%22%3E%3Crect fill=%22%231a1a24%22 width=%22300%22 height=%22400%22/%3E%3Ctext fill=%22%236b6b7b%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22%3ESem Capa%3C/text%3E%3C/svg%3E'">
+                        <div class="absolute top-2 left-2">
+                            <span class="status-badge ${statusClass}">${game.status}</span>
+                        </div>
+                        <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
+                            <p class="font-display text-sm font-bold truncate">${game.name}</p>
+                            <p class="text-xs mt-1" style="color: var(--fg-muted);">${game.genre}</p>
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs" style="color: var(--fg-muted);">
+                                ${platformHtml}
+                            </div>
+                            <span class="text-xs font-medium">${hoursDisplay}</span>
+                        </div>
+                        ${game.rating ? `
+                            <div class="rating">
+                                <div class="rating-bar"><div class="rating-fill" style="width: ${ratingWidth}%"></div></div>
+                                <span class="text-xs ml-2 font-bold" style="color: var(--accent);">${game.rating}/10</span>
+                            </div>
+                        ` : `<p class="text-xs" style="color: var(--fg-muted);">Sem avaliacao</p>`}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'Jogando': 'status-jogando',
+                'Zeradasso': 'status-zeradasso',
+                'Historia Completa': 'status-historia',
+                'Voltarei Para Zerar': 'status-voltarei',
+                'Dropei mas Voltarei': 'status-dropei',
+                'Dropei desta Merda': 'status-dropei',
+                'Nao Jogado': 'status-nao',
+                'Passatempo': 'status-voltarei'
+            };
+            return statusMap[status] || 'status-nao';
+        }
+
+        function updateStats() {
+            const total = games.length;
+            const hours = games.reduce((sum, game) => sum + (game.hours || 0), 0);
+            const completed = games.filter(g => g.status === 'Zeradasso').length;
+            const storyComplete = games.filter(g => g.status === 'Historia Completa').length;
+            const playing = games.filter(g => g.status === 'Jogando').length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-hours').textContent = hours.toLocaleString();
+            document.getElementById('stat-completed').textContent = completed;
+            document.getElementById('stat-story').textContent = storyComplete;
+            document.getElementById('stat-playing').textContent = playing;
+        }
+
+        function switchCoverInput(type) {
+            document.querySelectorAll('.cover-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.cover-tab[onclick="switchCoverInput('${type}')"]`).classList.add('active');
+
+            document.getElementById('cover-url-group').classList.remove('active');
+            document.getElementById('cover-file-group').classList.remove('active');
+
+            if (type === 'url') {
+                document.getElementById('cover-url-group').classList.add('active');
+            } else {
+                document.getElementById('cover-file-group').classList.add('active');
+            }
+        }
+
+        function openModal() {
+            document.getElementById('modal-title').textContent = 'Adicionar Jogo';
+            document.getElementById('game-form').reset();
+            document.getElementById('game-id').value = '';
+            document.getElementById('game-cover').value = '';
+            document.getElementById('game-cover-url').value = '';
+            document.getElementById('delete-btn').classList.add('hidden');
+            
+            clearCoverPreview();
+            switchCoverInput('url');
+            document.getElementById('rating-display').textContent = '5';
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        function handleCoverUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result;
+                    document.getElementById('game-cover').value = base64;
+                    document.getElementById('cover-preview').src = base64;
+                    document.getElementById('cover-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearCoverPreview() {
+            document.getElementById('cover-preview-container').classList.add('hidden');
+            document.getElementById('cover-preview').src = '';
+            document.getElementById('game-cover').value = '';
+            document.getElementById('cover-input').value = '';
+        }
+
+        function editGame(id) {
+            const game = games.find(g => g.id === id);
+            if (!game) return;
+
+            document.getElementById('modal-title').textContent = 'Editar Jogo';
+            document.getElementById('game-id').value = game.id;
+            document.getElementById('game-name').value = game.name;
+            document.getElementById('game-genre').value = game.genre;
+            document.getElementById('game-platform').value = game.platform;
+            document.getElementById('game-status').value = game.status;
+            document.getElementById('game-hours').value = game.hours || '';
+            document.getElementById('game-rating').value = game.rating || 5;
+            document.getElementById('rating-display').textContent = game.rating || 5;
+            document.getElementById('game-release').value = game.release || '';
+            document.getElementById('delete-btn').classList.remove('hidden');
+
+            if (game.cover) {
+                document.getElementById('game-cover').value = game.cover;
+                document.getElementById('cover-preview').src = game.cover;
+                document.getElementById('cover-preview-container').classList.remove('hidden');
+                if (game.cover.startsWith('http')) {
+                    document.getElementById('game-cover-url').value = game.cover;
+                    switchCoverInput('url');
+                } else {
+                    document.getElementById('game-cover-url').value = '';
+                    switchCoverInput('file');
+                }
+            } else {
+                clearCoverPreview();
+                switchCoverInput('url');
+            }
+
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('game-id').value;
+            
+            let coverSource = document.getElementById('game-cover-url').value.trim();
+            if (!coverSource) {
+                coverSource = document.getElementById('game-cover').value;
+            }
+
+            const gameData = {
+                name: document.getElementById('game-name').value,
+                cover: coverSource,
+                genre: document.getElementById('game-genre').value,
+                platform: document.getElementById('game-platform').value,
+                status: document.getElementById('game-status').value,
+                hours: parseInt(document.getElementById('game-hours').value) || null,
+                rating: parseInt(document.getElementById('game-rating').value),
+                release: document.getElementById('game-release').value || null
+            };
+
+            if (id) {
+                gameData.id = id;
+            }
+
+            saveGame(gameData);
+            closeModal();
+            showToast('Jogo salvo!', 'success');
+        }
+
+        function deleteGameFromModal() {
+            const id = document.getElementById('game-id').value;
+            if (id) {
+                deleteGameId = id;
+                document.getElementById('delete-modal').classList.add('active');
+            }
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.remove('active');
+            deleteGameId = null;
+        }
+
+        function confirmDelete() {
+            if (deleteGameId) {
+                deleteGame(deleteGameId);
+                showToast('Jogo excluido!', 'success');
+            }
+            closeDeleteModal();
+            closeModal();
+        }
+
+        // Settings Functions
+        function openSettingsModal() {
+            renderConfigLists();
+            document.getElementById('settings-modal').classList.add('active');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('active');
+        }
+
+        function renderConfigLists() {
+            renderConfigSection('genres', 'genre-list');
+            renderConfigSection('platforms', 'platform-list');
+            renderConfigSection('statuses', 'status-list');
+        }
+
+        function renderConfigSection(type, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = config[type].map(item => {
+                const displayName = (typeof item === 'object') ? item.name : item;
+                const iconHtml = (typeof item === 'object' && item.icon) 
+                    ? `<img src="${item.icon}" class="config-item-icon" onerror="this.style.display='none'">` 
+                    : '';
+
+                return `
+                    <div class="config-item">
+                        <div style="display:flex; align-items:center;">
+                            ${iconHtml}
+                            <span>${displayName}</span>
+                        </div>
+                        <button class="config-delete-btn" onclick="removeConfigItem('${type}', '${displayName}')" title="Remover">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addConfigItem(type, inputId) {
+            const input = document.getElementById(inputId);
+            const value = input.value.trim();
+            
+            if (!value) {
+                showToast('Digite um valor valido!', 'error');
+                return;
+            }
+
+            const exists = config[type].some(item => {
+                return (typeof item === 'object') ? item.name === value : item === value;
+            });
+
+            if (exists) {
+                showToast('Este item ja existe!', 'error');
+                return;
+            }
+
+            config[type].push(value);
+            saveConfig();
+            renderConfigLists();
+            populateSelects();
+            
+            if (type === 'statuses') {
+                renderFilterChips();
+            }
+            
+            input.value = '';
+            showToast('Item adicionado!', 'success');
+        }
+
+        function addPlatform() {
+            const nameInput = document.getElementById('new-platform-name');
+            const iconInput = document.getElementById('new-platform-icon');
+            const name = nameInput.value.trim();
+            const icon = iconInput.value.trim();
+
+            if (!name) {
+                showToast('O nome da plataforma e obrigatorio!', 'error');
+                return;
+            }
+
+            const existingIndex = config.platforms.findIndex(p => p.name === name);
+
+            if (existingIndex !== -1) {
+                config.platforms[existingIndex].icon = icon;
+                showToast('Plataforma atualizada!', 'success');
+            } else {
+                config.platforms.push({ name: name, icon: icon });
+                showToast('Plataforma adicionada!', 'success');
+            }
+
+            saveConfig();
+            renderConfigLists();
+            populateSelects();
+            renderGames();
+
+            nameInput.value = '';
+            iconInput.value = '';
+        }
+
+        function removeConfigItem(type, value) {
+            if (type === 'platforms') {
+                config[type] = config[type].filter(item => item.name !== value);
+            } else {
+                config[type] = config[type].filter(item => item !== value);
+            }
+            
+            saveConfig();
+            renderConfigLists();
+            populateSelects();
+            
+            if (type === 'statuses') {
+                renderFilterChips();
+            }
+            if (type === 'platforms') {
+                renderGames();
+            }
+            
+            showToast('Item removido!', 'success');
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
