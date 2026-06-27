@@ -51,6 +51,11 @@ input,select,textarea{font-family:inherit}
 .auth-reset{text-align:center;margin-top:16px;font-size:12px;color:var(--fg2)}
 .auth-reset span{color:var(--acc);cursor:pointer}
 .auth-reset span:hover{text-decoration:underline}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--fg3);font-size:11px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.btn-google{width:100%;padding:11px;background:#fff;color:#1f1f1f;border-radius:8px;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;margin-bottom:4px;border:none}
+.btn-google:hover{background:#f5f5f5;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.btn-google svg{flex-shrink:0}
 
 /* ── APP ── */
 #app{display:none;flex-direction:column;height:100vh;overflow:hidden}
@@ -319,20 +324,27 @@ select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xm
       <div class="auth-tab" id="tab-register" onclick="switchAuth('register')">Criar Conta</div>
     </div>
     <div class="auth-err" id="auth-err"></div>
+    <!-- Google -->
+    <button class="btn-google" onclick="doGoogleLogin()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+      Continuar com Google
+    </button>
+    <div class="auth-divider">ou</div>
+
     <div id="login-form">
       <label class="auth-label">Email</label>
-      <input class="auth-input" id="l-email" type="email" placeholder="seu@email.com">
+      <input class="auth-input" id="l-email" type="email" placeholder="seu@email.com" autocomplete="email">
       <label class="auth-label">Senha</label>
-      <input class="auth-input" id="l-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="auth-btn" onclick="doLogin()">ENTRAR</button>
+      <input class="auth-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="auth-btn" id="login-btn" onclick="doLogin()">ENTRAR</button>
       <div class="auth-reset">Esqueceu a senha? <span onclick="doReset()">Recuperar por email</span></div>
     </div>
     <div id="register-form" style="display:none">
       <label class="auth-label">Email</label>
-      <input class="auth-input" id="r-email" type="email" placeholder="seu@email.com">
+      <input class="auth-input" id="r-email" type="email" placeholder="seu@email.com" autocomplete="email">
       <label class="auth-label">Senha</label>
-      <input class="auth-input" id="r-pass" type="password" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')doRegister()">
-      <button class="auth-btn" onclick="doRegister()">CRIAR CONTA</button>
+      <input class="auth-input" id="r-pass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="auth-btn" id="register-btn" onclick="doRegister()">CRIAR CONTA</button>
     </div>
   </div>
 </div>
@@ -573,7 +585,7 @@ select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xm
       </div>
       <div class="form-group">
         <label>Data de Lançamento</label>
-        <input class="finput" id="gm-release" type="date">
+        <input class="finput" id="gm-release" type="text" placeholder="DD/MM/AAAA" maxlength="10" oninput="maskDate(this)">
       </div>
       <div class="form-group">
         <label>Nota Pessoal</label>
@@ -635,6 +647,7 @@ const firebaseConfig = {
   messagingSenderId: "1044768935238",
   appId: "1:1044768935238:web:ee63d8b870ea5b59e5a947"
 };
+
 // ══════════════════════════════════════════════
 
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -651,19 +664,43 @@ let chartDonutW=null, chartGenreW=null, chartHoursPlatW=null;
 let pendingMigrationGames=null, pendingMigrationConfig=null;
 
 const DEF_CONFIG = {
-  genres:['Ação/Aventura RPG','Soulslike','Hack \'n\' Slash','RPG de Turno','Ação/Aventura FPS',
-          'Plataforma Terror','Plataforma Ação/Aventura','Corrida','Simulação','Terror','Metroidvania'],
-  platforms:[
-    {name:'PC (Steam)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/64px-Steam_icon_logo.svg.png'},
-    {name:'PC (Epic Games)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/64px-Epic_Games_logo.svg.png'},
-    {name:'PC (GOG)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/GOG_logo.svg/64px-GOG_logo.svg.png'},
-    {name:'PC (Hydra)',icon:''},
-    {name:'PC (Ubisoft)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Ubisoft_logo.svg/64px-Ubisoft_logo.svg.png'},
-    {name:'Xbox 360',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/64px-Xbox_360_logo.svg.png'},
-    {name:'Playstation 2',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/PlayStation_2_logo.svg/64px-PlayStation_2_logo.svg.png'}
+  genres:[
+    'Ação / Aventura','RPG','Soulslike','Hack \'n\' Slash','RPG de Turno',
+    'FPS','Plataforma','Terror / Survival Horror','Metroidvania','Mundo Aberto',
+    'Corrida','Simulação','Estratégia','Luta','Esporte','Battle Royale',
+    'Visual Novel','Puzzle','Roguelike','MMORPG'
   ],
-  statuses:['Não Jogado','Jogando','Voltarei Para Zerar','História Completa',
-            'Zeradasso','Dropei mas Voltarei','Dropei desta Merda','Passatempo']
+  platforms:[
+    {name:'PC (Steam)',        icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/64px-Steam_icon_logo.svg.png'},
+    {name:'PC (Epic Games)',   icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/64px-Epic_Games_logo.svg.png'},
+    {name:'PC (GOG)',          icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/GOG_logo.svg/64px-GOG_logo.svg.png'},
+    {name:'PC (Ubisoft)',      icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Ubisoft_logo.svg/64px-Ubisoft_logo.svg.png'},
+    {name:'PC (EA App)',       icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/EA_icon.svg/64px-EA_icon.svg.png'},
+    {name:'PC (Hydra)',        icon:''},
+    {name:'PlayStation 5',     icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/64px-PlayStation_logo.svg.png'},
+    {name:'PlayStation 4',     icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/64px-PlayStation_logo.svg.png'},
+    {name:'PlayStation 3',     icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/64px-PlayStation_logo.svg.png'},
+    {name:'PlayStation 2',     icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/64px-PlayStation_logo.svg.png'},
+    {name:'Xbox Series X/S',   icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/64px-Xbox_360_logo.svg.png'},
+    {name:'Xbox One',          icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/64px-Xbox_360_logo.svg.png'},
+    {name:'Xbox 360',          icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/64px-Xbox_360_logo.svg.png'},
+    {name:'Nintendo Switch',   icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Nintendo_Switch_Logo.svg/64px-Nintendo_Switch_Logo.svg.png'},
+    {name:'Game Boy Advance',  icon:''},
+    {name:'Android',           icon:''},
+    {name:'iOS',               icon:''}
+  ],
+  statuses:[
+    'Não Jogado',
+    'Jogando',
+    'Pausado',
+    'Voltarei Para Zerar',
+    'História Completa',
+    'Zeradasso',
+    'Platinum / 100%',
+    'Dropei mas Voltarei',
+    'Dropei desta Merda',
+    'Passatempo / Online'
+  ]
 };
 
 const DEF_WIDGETS = ['stat-total','stat-hours','stat-done','stat-playing','stat-avg',
@@ -688,11 +725,20 @@ const WIDGET_DEFS = {
 
 // ── HELPERS ──
 function statusClass(s){
-  return {'Jogando':'s-playing','Zeradasso':'s-done','História Completa':'s-story',
-          'Voltarei Para Zerar':'s-backlog','Dropei mas Voltarei':'s-dropped',
-          'Dropei desta Merda':'s-dropped','Passatempo':'s-backlog','Não Jogado':'s-none'}[s]||'s-none';
+  const m={'Jogando':'s-playing','Zeradasso':'s-done','Platinum / 100%':'s-done',
+    'História Completa':'s-story','Voltarei Para Zerar':'s-backlog','Pausado':'s-backlog',
+    'Dropei mas Voltarei':'s-dropped','Dropei desta Merda':'s-dropped',
+    'Passatempo / Online':'s-backlog','Não Jogado':'s-none'};
+  return m[s]||'s-none';
 }
-function fmtDate(iso){if(!iso)return '';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
+
+
+
+
+
+function fmtDate(iso){if(!iso)return '';try{const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}catch{return iso}}
+function brToIso(br){if(!br)return null;const p=br.split('/');if(p.length!==3||p[2].length!==4)return null;return`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`}
+function maskDate(el){let v=el.value.replace(/\D/g,'');if(v.length>=3)v=v.slice(0,2)+'/'+v.slice(2);if(v.length>=6)v=v.slice(0,5)+'/'+v.slice(5,9);el.value=v;}
 function getPlatform(n){return config.platforms.find(p=>p.name===n)||{name:n,icon:''}}
 const PH="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 400'%3E%3Crect fill='%230d1220' width='300' height='400'/%3E%3Ctext fill='%234a5568' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='13'%3ESem Capa%3C/text%3E%3C/svg%3E";
 
@@ -788,48 +834,82 @@ function switchAuth(t){
   document.getElementById('register-form').style.display=t==='register'?'block':'none';
   document.getElementById('auth-err').style.display='none';
 }
-function showAuthErr(msg){const e=document.getElementById('auth-err');e.textContent=msg;e.style.display='block'}
+function showAuthErr(msg){
+  const e=document.getElementById('auth-err');
+  e.textContent=msg;e.style.display='block';
+  e.style.background=msg.includes('enviado')?'rgba(0,255,136,.1)':'rgba(255,71,87,.1)';
+  e.style.borderColor=msg.includes('enviado')?'rgba(0,255,136,.3)':'rgba(255,71,87,.3)';
+  e.style.color=msg.includes('enviado')?'var(--green)':'var(--red)';
+}
+function setAuthLoading(btnId,loading,txt){
+  const b=document.getElementById(btnId);if(!b)return;
+  b.disabled=loading;b.textContent=loading?'Aguarde...':txt;
+  b.style.opacity=loading?'.6':'1';
+}
 function doLogin(){
   const e=document.getElementById('l-email').value.trim(),p=document.getElementById('l-pass').value;
   if(!e||!p){showAuthErr('Preencha email e senha.');return}
-  auth.signInWithEmailAndPassword(e,p).catch(err=>showAuthErr(translateFBErr(err.code)));
+  document.getElementById('auth-err').style.display='none';
+  setAuthLoading('login-btn',true,'ENTRAR');
+  auth.signInWithEmailAndPassword(e,p)
+    .catch(err=>{showAuthErr(translateFBErr(err.code));setAuthLoading('login-btn',false,'ENTRAR')});
 }
 function doRegister(){
   const e=document.getElementById('r-email').value.trim(),p=document.getElementById('r-pass').value;
   if(!e||!p){showAuthErr('Preencha email e senha.');return}
   if(p.length<6){showAuthErr('Senha deve ter no mínimo 6 caracteres.');return}
-  auth.createUserWithEmailAndPassword(e,p).catch(err=>showAuthErr(translateFBErr(err.code)));
+  document.getElementById('auth-err').style.display='none';
+  setAuthLoading('register-btn',true,'CRIAR CONTA');
+  auth.createUserWithEmailAndPassword(e,p)
+    .catch(err=>{showAuthErr(translateFBErr(err.code));setAuthLoading('register-btn',false,'CRIAR CONTA')});
+}
+function doGoogleLogin(){
+  const provider=new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err=>{
+    if(err.code!=='auth/popup-closed-by-user') showAuthErr(translateFBErr(err.code));
+  });
 }
 function doLogout(){auth.signOut()}
 function doReset(){
   const e=document.getElementById('l-email').value.trim();
   if(!e){showAuthErr('Digite seu email primeiro.');return}
-  auth.sendPasswordResetEmail(e).then(()=>showAuthErr('Email de recuperação enviado!')).catch(()=>showAuthErr('Erro ao enviar email.'));
+  auth.sendPasswordResetEmail(e)
+    .then(()=>showAuthErr('✓ Email de recuperação enviado! Verifique sua caixa de entrada.'))
+    .catch(err=>showAuthErr(translateFBErr(err.code)));
 }
 function changePass(){
   const p=document.getElementById('new-pass').value,c=document.getElementById('conf-pass').value;
   if(!p||p.length<6){toast('Senha deve ter 6+ caracteres','err');return}
   if(p!==c){toast('Senhas não conferem','err');return}
-  auth.currentUser.updatePassword(p).then(()=>toast('Senha alterada!','ok')).catch(()=>toast('Faça login novamente para alterar a senha','err'));
+  auth.currentUser.updatePassword(p)
+    .then(()=>{toast('Senha alterada!','ok');document.getElementById('new-pass').value='';document.getElementById('conf-pass').value='';})
+    .catch(()=>toast('Faça login novamente para alterar a senha','err'));
 }
 function translateFBErr(code){
   return({'auth/user-not-found':'Usuário não encontrado.','auth/wrong-password':'Senha incorreta.',
-          'auth/email-already-in-use':'Email já em uso.','auth/invalid-email':'Email inválido.',
-          'auth/weak-password':'Senha muito fraca.','auth/too-many-requests':'Muitas tentativas. Tente mais tarde.',
-          'auth/invalid-credential':'Email ou senha inválidos.'})[code]||'Erro desconhecido.';
+          'auth/email-already-in-use':'Este email já está em uso.','auth/invalid-email':'Email inválido.',
+          'auth/weak-password':'Senha muito fraca (mínimo 6 caracteres).','auth/too-many-requests':'Muitas tentativas. Tente novamente mais tarde.',
+          'auth/invalid-credential':'Email ou senha incorretos.','auth/network-request-failed':'Sem conexão com a internet.',
+          'auth/popup-blocked':'Popup bloqueado. Permita popups para este site.'})[code]||`Erro: ${code}`;
 }
 
 auth.onAuthStateChanged(user=>{
+  // Sempre reseta loading dos botões quando o estado muda
+  setAuthLoading('login-btn',false,'ENTRAR');
+  setAuthLoading('register-btn',false,'CRIAR CONTA');
   if(user){
     currentUser=user;
     document.getElementById('auth-screen').style.display='none';
     document.getElementById('app').classList.add('visible');
-    const ini=(user.email||'?')[0].toUpperCase();
+    const displayName = user.displayName || user.email || '?';
+    const ini = displayName[0].toUpperCase();
+    const emailOrName = user.email || user.displayName || 'Usuário';
+    const shortName = user.displayName || (user.email?user.email.split('@')[0]:'Jogador');
     document.getElementById('user-avatar').textContent=ini;
-    document.getElementById('user-email').textContent=user.email;
+    document.getElementById('user-email').textContent=emailOrName;
     document.getElementById('profile-ava').textContent=ini;
-    document.getElementById('profile-name').textContent=user.email.split('@')[0];
-    document.getElementById('profile-email-text').textContent=user.email;
+    document.getElementById('profile-name').textContent=shortName;
+    document.getElementById('profile-email-text').textContent=emailOrName;
     loadData();
   } else {
     currentUser=null;
@@ -1168,7 +1248,7 @@ function editGame(id){
   document.getElementById('gm-hours').value=g.hours||'';
   document.getElementById('gm-rating').value=g.rating||5;
   document.getElementById('gm-rval').textContent=g.rating||5;
-  document.getElementById('gm-release').value=g.release||'';
+  document.getElementById('gm-release').value=isoToBr(g.release||'');
   document.getElementById('gm-note').value=g.note||'';
   document.getElementById('gm-del-btn').style.display='inline-flex';
   if(g.cover){
@@ -1211,7 +1291,7 @@ async function saveGame(){
     status:document.getElementById('gm-status').value,
     hours:parseInt(document.getElementById('gm-hours').value)||null,
     rating:parseInt(document.getElementById('gm-rating').value),
-    release:document.getElementById('gm-release').value||null,
+    release:brToIso(document.getElementById('gm-release').value)||null,
     note:document.getElementById('gm-note').value||''};
   const eid=document.getElementById('gm-id').value;
   setSyncStatus('syncing','Salvando...');
