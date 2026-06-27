@@ -1,1380 +1,767 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gaming Backlog Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaming Backlog</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#080810;--bg1:#0f0f1a;--bg2:#161625;--bg3:#1e1e30;--bg4:#262640;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--fg:#e8e8f0;--fg2:#9090b0;--fg3:#5a5a7a;--accent:#7c6aff;--accent2:#5e4fe0;--green:#22d994;--gold:#f5c842;--blue:#4ab3f4;--red:#ff5572;--orange:#ff8c42;--r:10px;--r2:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg0);color:var(--fg);font-family:'Inter',sans-serif;font-size:14px;overflow-x:hidden}
+button{cursor:pointer;font-family:inherit}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg1)}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 
-    <style>
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-card: #1a1a24;
-            --fg-primary: #e8e8ec;
-            --fg-muted: #6b6b7b;
-            --accent: #00ff88;
-            --accent-dim: #00cc6a;
-            --danger: #ff4757;
-            --warning: #ffa502;
-            --border: #2a2a3a;
-        }
+/* AUTH */
+#auth-screen{position:fixed;inset:0;background:var(--bg0);display:flex;align-items:center;justify-content:center;z-index:9999;background-image:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124,106,255,0.18) 0%, transparent 70%)}
+.auth-card{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,0.6)}
+.auth-logo{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;color:var(--accent);letter-spacing:3px;text-align:center;margin-bottom:6px}
+.auth-sub{font-size:12px;color:var(--fg3);text-align:center;margin-bottom:32px;letter-spacing:1px}
+.auth-tabs{display:flex;background:var(--bg1);border-radius:8px;padding:3px;margin-bottom:24px}
+.auth-tab{flex:1;padding:8px;border:none;background:transparent;color:var(--fg2);border-radius:6px;font-size:13px;font-weight:500;transition:all .2s}
+.auth-tab.active{background:var(--accent);color:#fff}
+.auth-input{background:var(--bg1);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--fg);width:100%;font-size:13px;transition:all .2s;margin-bottom:12px}
+.auth-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,106,255,0.15)}
+.auth-input::placeholder{color:var(--fg3)}
+.auth-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;width:100%;font-size:14px;font-weight:600;transition:all .2s;margin-top:4px}
+.auth-btn:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,106,255,0.35)}
+.auth-err{color:var(--red);font-size:12px;text-align:center;margin-top:10px;min-height:18px}
+.auth-pass-row{position:relative}
+.auth-pass-row input{padding-right:40px}
+.auth-toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--fg3);cursor:pointer;padding:4px;font-size:16px}
 
-        * { box-sizing: border-box; }
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:var(--bg0);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000}
+.loading-logo{font-family:'Rajdhani',sans-serif;font-size:32px;font-weight:700;color:var(--accent);letter-spacing:4px;margin-bottom:24px}
+.loading-bar{width:200px;height:2px;background:var(--bg3);border-radius:1px;overflow:hidden}
+.loading-fill{height:100%;background:var(--accent);border-radius:1px;animation:load 1.5s ease infinite}
+@keyframes load{0%{width:0;margin-left:0}50%{width:60%}100%{width:0;margin-left:100%}}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
-            color: var(--fg-primary);
-            min-height: 100vh;
-        }
+/* APP */
+#app{display:none;height:100vh;flex-direction:column}
+#app.visible{display:flex}
 
-        .font-display { font-family: 'Orbitron', sans-serif; }
+/* TOPBAR */
+#topbar{height:56px;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;position:sticky;top:0;z-index:100;flex-shrink:0}
+.logo{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--accent);letter-spacing:2px}
+.logo span{color:var(--fg2);font-weight:400}
+.topbar-search{flex:1;max-width:320px;position:relative;margin-left:20px}
+.topbar-search input{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 12px 7px 34px;color:var(--fg);width:100%;font-size:13px;transition:all .2s}
+.topbar-search input:focus{outline:none;border-color:var(--accent);background:var(--bg3)}
+.topbar-search input::placeholder{color:var(--fg3)}
+.topbar-search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--fg3)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.user-badge{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--fg2)}
+.user-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--fg3);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--fg3);transition:background .3s}
+.sync-dot.synced{background:var(--green)}.sync-dot.syncing{background:var(--gold);animation:pulse 1s infinite}.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-        .bg-grid {
-            background-image: 
-                linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
-            background-size: 50px 50px;
-        }
+/* BUTTONS */
+.btn{border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.btn-ghost{background:transparent;color:var(--fg2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg3);border-color:var(--border2);color:var(--fg)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,106,255,0.35)}
+.btn-danger-sm{background:rgba(255,85,114,0.12);color:var(--red);border:1px solid rgba(255,85,114,0.25)}
+.btn-danger-sm:hover{background:rgba(255,85,114,0.22)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--fg2);display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer}
+.icon-btn:hover{background:var(--bg3);border-color:var(--border2);color:var(--fg)}
 
-        .glow-orb {
-            position: fixed;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            filter: blur(150px);
-            opacity: 0.15;
-            pointer-events: none;
-            z-index: 0;
-        }
+/* MAIN */
+#main{flex:1;overflow-y:auto;padding:24px}
 
-        .orb-1 { background: var(--accent); top: -200px; right: -200px; }
-        .orb-2 { background: #ff6b35; bottom: -300px; left: -200px; }
+/* NAV */
+.nav-tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:0}
+.nav-tab{padding:10px 18px;border:none;background:transparent;color:var(--fg2);font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
+.nav-tab:hover{color:var(--fg)}.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-        /* Login Screen */
-        .auth-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+/* DASHBOARD */
+.dash-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.dash-toolbar-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;color:var(--fg);letter-spacing:.5px;margin-right:auto}
+#dashboard-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.widget{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;position:relative;transition:border-color .2s}
+.widget:hover{border-color:var(--border2)}
+.widget-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
+.widget-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--fg3)}
+.widget-remove{width:22px;height:22px;border-radius:5px;border:none;background:transparent;color:var(--fg3);display:none;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .2s}
+.edit-mode .widget-remove{display:flex}
+.widget-remove:hover{background:rgba(255,85,114,0.15);color:var(--red)}
+.w-1{grid-column:span 3}.w-2{grid-column:span 4}.w-3{grid-column:span 6}.w-4{grid-column:span 8}.w-5{grid-column:span 12}
+.w-h2{min-height:180px}.w-h3{min-height:240px}
+@media(max-width:900px){.w-1,.w-2{grid-column:span 6}.w-3,.w-4{grid-column:span 12}}
+@media(max-width:600px){.w-1,.w-2,.w-3,.w-4,.w-5{grid-column:span 12}}
+.stat-big{font-family:'Rajdhani',sans-serif;font-size:42px;font-weight:700;line-height:1;padding:4px 16px 16px}
+.stat-label2{font-size:11px;color:var(--fg3);padding:0 16px 14px}
+.chart-wrap{padding:0 16px 16px;position:relative}.chart-wrap canvas{max-height:200px}
+.games-list-widget{max-height:260px;overflow-y:auto}
+.game-list-row{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);transition:background .15s;cursor:pointer}
+.game-list-row:hover{background:var(--bg3)}.game-list-row:last-child{border-bottom:none}
+.game-list-cover{width:32px;height:44px;border-radius:4px;object-fit:cover;flex-shrink:0;background:var(--bg4)}
+.game-list-info{flex:1;min-width:0}
+.game-list-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-list-meta{font-size:11px;color:var(--fg3);margin-top:2px}
+.prog-bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;border-radius:2px;transition:width .5s ease}
 
-        .auth-box {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 40px;
-            width: 100%;
-            max-width: 420px;
-            position: relative;
-            z-index: 10;
-        }
+/* LIBRARY */
+.library-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.library-toolbar-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:20px;background:var(--bg3);border:1px solid var(--border);color:var(--fg2);font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.chip:hover{border-color:var(--border2);color:var(--fg)}.chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.view-toggle{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px}
+.view-btn{width:30px;height:26px;border:none;background:transparent;color:var(--fg3);border-radius:5px;display:flex;align-items:center;justify-content:center;transition:all .2s;cursor:pointer}
+.view-btn.active{background:var(--bg4);color:var(--fg)}
+.games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.game-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;cursor:pointer;transition:all .25s}
+.game-card:hover{transform:translateY(-5px);border-color:var(--accent);box-shadow:0 16px 40px rgba(0,0,0,0.5)}
+.game-card-cover{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;transition:transform .4s}
+.game-card:hover .game-card-cover{transform:scale(1.04)}
+.cover-wrap{position:relative;overflow:hidden}
+.card-status{position:absolute;top:6px;left:6px}
+.card-rating{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);border-radius:5px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--gold)}
+.cover-gradient{position:absolute;bottom:0;left:0;right:0;height:60%;background:linear-gradient(to top, rgba(0,0,0,.9) 0%, transparent 100%)}
+.cover-info{position:absolute;bottom:0;left:0;right:0;padding:10px 10px 8px}
+.cover-info .gname{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cover-info .ggenre{font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-footer{padding:8px 10px;display:flex;align-items:center;justify-content:space-between}
+.card-footer .plat{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--fg3)}
+.card-footer .plat img{width:12px;height:12px;object-fit:contain}
+.card-footer .hours{font-size:10px;color:var(--fg3);font-family:'JetBrains Mono',monospace}
+.mini-rbar{height:2px;background:var(--bg4);border-radius:1px;overflow:hidden;margin-top:4px}
+.mini-rfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:1px}
+.games-table{width:100%;border-collapse:collapse}
+.games-table th{text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--fg3);border-bottom:1px solid var(--border);font-weight:600}
+.games-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.games-table tr:hover td{background:var(--bg3);cursor:pointer}
+.games-table tr:last-child td{border-bottom:none}
+.tbl-cover{width:36px;height:50px;border-radius:4px;object-fit:cover}
+.empty-state{text-align:center;padding:64px 0;color:var(--fg3)}
+.empty-state p{margin-top:12px;font-size:14px}
+.sbadge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+.s-playing{background:rgba(34,217,148,0.2);color:#22d994}.s-completed{background:rgba(245,200,66,0.2);color:#f5c842}
+.s-story{background:rgba(74,179,244,0.2);color:#4ab3f4}.s-backlog{background:rgba(255,140,66,0.2);color:#ff8c42}
+.s-dropped{background:rgba(255,85,114,0.2);color:#ff5572}.s-inactive{background:rgba(90,90,122,0.2);color:#5a5a7a}
 
-        .auth-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 32px;
-        }
-
-        .auth-tab {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--fg-muted);
-            text-align: center;
-        }
-
-        .auth-tab.active {
-            background: var(--accent);
-            color: var(--bg-primary);
-            border-color: var(--accent);
-        }
-
-        /* User Bar */
-        .user-bar {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 12px 20px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), #00ffcc);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: var(--bg-primary);
-            font-size: 14px;
-        }
-
-        /* Game Card */
-        .game-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .game-card:hover {
-            transform: translateY(-8px);
-            border-color: var(--accent);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 255, 136, 0.1);
-        }
-
-        .game-card .cover {
-            width: 100%;
-            aspect-ratio: 3/4;
-            object-fit: cover;
-            transition: transform 0.5s ease;
-        }
-
-        .game-card:hover .cover { transform: scale(1.05); }
-
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .status-jogando { background: rgba(0, 255, 136, 0.85); color: #000; }
-        .status-zeradasso { background: rgba(255, 215, 0, 0.9); color: #000; }
-        .status-historia { background: rgba(100, 149, 237, 0.9); color: #fff; }
-        .status-voltarei { background: rgba(255, 165, 2, 0.9); color: #000; }
-        .status-dropei { background: rgba(255, 71, 87, 0.9); color: #fff; }
-        .status-nao { background: rgba(107, 107, 123, 0.9); color: #fff; }
-
-        .platform-display { display: flex; align-items: center; gap: 6px; }
-        .platform-icon { width: 16px; height: 16px; object-fit: contain; border-radius: 2px; }
-
-        .rating { display: flex; gap: 2px; align-items: center; }
-        .rating-bar { height: 4px; border-radius: 2px; background: var(--border); flex: 1; overflow: hidden; }
-        .rating-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00ffcc); transition: width 0.5s ease; }
-
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .modal-overlay.active { opacity: 1; visibility: visible; }
-
-        .modal-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            max-width: 600px;
-            width: 95%;
-            max-height: 90vh;
-            overflow-y: auto;
-            transform: scale(0.9) translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
-
-        .form-input {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px 16px;
-            color: var(--fg-primary);
-            width: 100%;
-            transition: all 0.2s ease;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
-        }
-
-        .form-select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b6b7b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 40px;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-primary { background: var(--accent); color: var(--bg-primary); }
-        .btn-primary:hover { background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 255, 136, 0.3); }
-
-        .btn-secondary { background: var(--bg-card); color: var(--fg-primary); border: 1px solid var(--border); }
-        .btn-secondary:hover { border-color: var(--fg-muted); }
-
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-danger:hover { background: #ff6b7a; }
-
-        .btn-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--fg-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--accent), transparent);
-        }
-
-        .filter-chip {
-            padding: 8px 16px;
-            border-radius: 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--fg-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 13px;
-        }
-
-        .filter-chip:hover { border-color: var(--accent); color: var(--fg-primary); }
-        .filter-chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-in { animation: fadeInUp 0.5s ease forwards; }
-        .stagger-1 { animation-delay: 0.1s; }
-        .stagger-2 { animation-delay: 0.2s; }
-        .stagger-3 { animation-delay: 0.3s; }
-        .stagger-4 { animation-delay: 0.4s; }
-
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
-
-        .cover-upload {
-            border: 2px dashed var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-top: 12px;
-        }
-        .cover-upload:hover { border-color: var(--accent); background: rgba(0, 255, 136, 0.05); }
-        .cover-preview { max-width: 150px; border-radius: 8px; margin: 0 auto; }
-        .cover-tab {
-            display: inline-block;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 6px;
-            background: var(--bg-card);
-            margin-right: 8px;
-            font-size: 13px;
-            transition: all 0.2s;
-        }
-        .cover-tab.active { background: var(--accent); color: #000; font-weight: 600; }
-        .cover-input-group { display: none; }
-        .cover-input-group.active { display: block; }
-
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px 24px;
-            z-index: 200;
-            transform: translateY(100px);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-
-        .toast.show { transform: translateY(0); opacity: 1; }
-        .toast.success { border-color: var(--accent); }
-        .toast.error { border-color: var(--danger); }
-
-        .settings-section {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .config-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        .config-item:last-child { margin-bottom: 0; }
-
-        .config-delete-btn {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--fg-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .config-delete-btn:hover {
-            background: rgba(255, 71, 87, 0.1);
-            border-color: var(--danger);
-            color: var(--danger);
-        }
-
-        .add-item-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-            flex-wrap: wrap;
-        }
-        .add-item-row input { flex: 1; min-width: 120px; }
-
-        .config-item-icon {
-            width: 20px;
-            height: 20px;
-            object-fit: contain;
-            margin-right: 10px;
-            border-radius: 4px;
-            background: #fff;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-    </style>
+/* MODALS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:95%;max-width:580px;max-height:92vh;overflow-y:auto;transform:scale(.94) translateY(16px);transition:transform .25s;box-shadow:0 40px 80px rgba(0,0,0,0.6)}
+.overlay.open .modal{transform:scale(1) translateY(0)}
+.modal-sm{max-width:400px}.modal-lg{max-width:720px}
+.modal-inner{padding:24px}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-hdr h2{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px}
+.form-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--fg3);display:block;margin-bottom:6px}
+.form-control{background:var(--bg1);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--fg);width:100%;font-size:13px;transition:all .2s;-webkit-appearance:none}
+.form-control:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,106,255,0.12)}
+.form-control::placeholder{color:var(--fg3)}
+.form-actions{display:flex;gap:10px;padding-top:8px}
+.form-actions .btn{flex:1;justify-content:center;padding:11px}
+.rating-row{display:flex;align-items:center;gap:12px}
+.rating-row input[type=range]{flex:1;accent-color:var(--accent)}
+.rating-num{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--accent);min-width:34px;text-align:center}
+.cover-tabs{display:flex;gap:6px;margin-bottom:10px}
+.ctab{padding:5px 12px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);font-size:11px;font-weight:600;cursor:pointer;color:var(--fg3);text-transform:uppercase;letter-spacing:.5px;transition:all .2s}
+.ctab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.upload-zone{border:2px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;font-size:12px;color:var(--fg3)}
+.upload-zone:hover{border-color:var(--accent);background:rgba(124,106,255,0.04)}
+.cover-preview-box{display:none;margin-top:10px;background:var(--bg1);border-radius:8px;padding:12px;text-align:center}
+.cover-preview-box img{max-width:100px;border-radius:6px}.cover-preview-box.show{display:block}
+.rm-cover{font-size:11px;color:var(--red);cursor:pointer;display:block;margin-top:6px}
+.widget-picker-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.wp-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s;text-align:center}
+.wp-item:hover{border-color:var(--accent);background:rgba(124,106,255,0.08)}.wp-item.added{border-color:rgba(34,217,148,0.4);opacity:.6;cursor:default}
+.wp-icon{font-size:24px;margin-bottom:6px}.wp-name{font-size:12px;font-weight:600;color:var(--fg)}.wp-desc{font-size:10px;color:var(--fg3);margin-top:3px}
+.settings-section{background:var(--bg3);border-radius:10px;padding:16px;margin-bottom:14px}
+.settings-section h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;margin-bottom:12px}
+.cfg-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg2);border-radius:6px;margin-bottom:6px;font-size:13px}
+.cfg-item:last-child{margin-bottom:0}.cfg-left{display:flex;align-items:center;gap:8px}.cfg-left img{width:16px;height:16px;object-fit:contain;border-radius:3px}
+.cfg-del{width:24px;height:24px;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--fg3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.cfg-del:hover{background:rgba(255,85,114,0.12);border-color:rgba(255,85,114,0.3);color:var(--red)}
+.add-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.add-row .form-control{flex:1;min-width:100px}
+.del-icon-wrap{width:60px;height:60px;border-radius:50%;background:rgba(255,85,114,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.del-confirm{text-align:center;padding:8px 0}
+.del-confirm h3{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
+.del-confirm p{font-size:12px;color:var(--fg2);margin-bottom:20px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:13px 18px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 16px 40px rgba(0,0,0,0.4);max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}.toast.success{border-color:rgba(34,217,148,0.4)}.toast.error{border-color:rgba(255,85,114,0.4)}
+</style>
 </head>
-<body class="bg-grid">
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
+<body>
 
-    <!-- Tela de Login/Registro -->
-    <div id="auth-screen" class="auth-container hidden">
-        <div class="auth-box animate-in">
-            <h1 class="font-display text-2xl font-bold text-center mb-2" style="color: var(--accent);">GAMING BACKLOG</h1>
-            <p class="text-center text-sm mb-6" style="color: var(--fg-muted);">Acesse sua conta para sincronizar</p>
-            
-            <div class="auth-tabs">
-                <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</div>
-                <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Criar Conta</div>
-            </div>
+<div class="loading-overlay" id="loading">
+  <div class="loading-logo">BACKLOG</div>
+  <div class="loading-bar"><div class="loading-fill"></div></div>
+</div>
 
-            <!-- Login Form -->
-            <form id="login-form" class="space-y-4" onsubmit="handleLogin(event)">
-                <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Email</label>
-                    <input type="email" id="login-email" class="form-input" placeholder="seu@email.com" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Senha</label>
-                    <input type="password" id="login-password" class="form-input" placeholder="Sua senha" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-full">Entrar</button>
-            </form>
+<div id="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">BACKLOG</div>
+    <div class="auth-sub">GAMING TRACKER</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="setAuthTab('login')">Entrar</button>
+      <button class="auth-tab" onclick="setAuthTab('register')">Criar Conta</button>
+    </div>
+    <input class="auth-input" id="auth-email" type="email" placeholder="seu@email.com">
+    <div class="auth-pass-row">
+      <input class="auth-input" id="auth-pass" type="password" placeholder="Senha (mín. 6 caracteres)">
+      <button class="auth-toggle-pass" onclick="togglePassVis()" type="button" id="pass-toggle-btn">👁</button>
+    </div>
+    <div id="auth-name-wrap" style="display:none">
+      <input class="auth-input" id="auth-name" type="text" placeholder="Seu nome (opcional)">
+    </div>
+    <button class="auth-btn" id="auth-submit-btn" onclick="submitAuth()">Entrar</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
 
-            <!-- Register Form -->
-            <form id="register-form" class="space-y-4 hidden" onsubmit="handleRegister(event)">
-                <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Email</label>
-                    <input type="email" id="register-email" class="form-input" placeholder="seu@email.com" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Senha (minimo 6 caracteres)</label>
-                    <input type="password" id="register-password" class="form-input" placeholder="Crie uma senha" required minlength="6">
-                </div>
-                <button type="submit" class="btn btn-primary w-full">Criar Conta</button>
-            </form>
+<div id="app">
+  <div id="topbar">
+    <div class="logo">BACK<span>LOG</span></div>
+    <div class="topbar-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input id="search-input" placeholder="Buscar jogos..." oninput="handleSearch()">
+    </div>
+    <div class="topbar-right">
+      <div class="sync-badge">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-txt">—</span>
+      </div>
+      <button class="btn btn-accent btn-sm" onclick="openGameModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Adicionar
+      </button>
+      <button class="icon-btn" onclick="openSettings()" title="Configurações">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+      <div class="user-badge">
+        <div class="user-dot"></div>
+        <span id="user-name-display">—</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="doSignOut()">Sair</button>
+    </div>
+  </div>
 
-            <p class="text-xs text-center mt-4" style="color: var(--fg-muted);">Dados salvos na nuvem via Firebase</p>
-        </div>
+  <div id="main">
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-tab" data-tab="library" onclick="switchTab('library')">Biblioteca</button>
     </div>
 
-    <!-- App Principal -->
-    <div id="app-screen" class="relative z-10 max-w-7xl mx-auto px-4 py-8 hidden">
-        <!-- User Bar -->
-        <div class="user-bar animate-in">
-            <div class="user-info">
-                <div class="user-avatar" id="user-avatar">?</div>
-                <div>
-                    <p class="font-medium" id="user-name">Usuario</p>
-                    <p class="text-xs" style="color: var(--fg-muted);">Sincronizado na nuvem</p>
-                </div>
-            </div>
-            <button onclick="handleLogout()" class="btn btn-secondary text-sm" style="padding: 8px 16px;">Sair</button>
-        </div>
-
-        <!-- Header -->
-        <header class="mb-8 animate-in">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 class="font-display text-3xl md:text-4xl font-bold tracking-wider" style="color: var(--accent);">GAMING BACKLOG</h1>
-                    <p class="text-sm mt-2" style="color: var(--fg-muted);">Clique em um jogo para editar ou excluir</p>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="openSettingsModal()" class="btn btn-secondary flex items-center gap-2" title="Configuracoes">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-                        </svg>
-                        <span class="hidden sm:inline">Config</span>
-                    </button>
-                    <button onclick="openModal()" class="btn btn-primary flex items-center gap-2">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 5v14M5 12h14"/>
-                        </svg>
-                        Adicionar Jogo
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <!-- Stats Section -->
-        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 animate-in stagger-1">
-            <div class="stat-card">
-                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Total de Jogos</p>
-                <p class="font-display text-2xl font-bold" id="stat-total">0</p>
-            </div>
-            <div class="stat-card">
-                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Horas Jogadas</p>
-                <p class="font-display text-2xl font-bold" style="color: var(--accent);" id="stat-hours">0</p>
-            </div>
-            <div class="stat-card">
-                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Zerados</p>
-                <p class="font-display text-2xl font-bold" style="color: #ffd700;" id="stat-completed">0</p>
-            </div>
-            <div class="stat-card">
-                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Historia Completa</p>
-                <p class="font-display text-2xl font-bold" style="color: #6495ed;" id="stat-story">0</p>
-            </div>
-            <div class="stat-card">
-                <p class="text-xs uppercase tracking-wider mb-1" style="color: var(--fg-muted);">Jogando</p>
-                <p class="font-display text-2xl font-bold" style="color: #00ff88;" id="stat-playing">0</p>
-            </div>
-        </section>
-
-        <!-- Filters -->
-        <section class="mb-6 animate-in stagger-2">
-            <div class="flex flex-wrap gap-3 items-center" id="filter-container">
-                <span class="text-sm font-medium" style="color: var(--fg-muted);">Filtrar:</span>
-                <button class="filter-chip active" data-filter="all">Todos</button>
-            </div>
-        </section>
-
-        <!-- Search -->
-        <section class="mb-6 animate-in stagger-3">
-            <div class="relative max-w-md">
-                <svg class="absolute left-4 top-1/2 -translate-y-1/2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="M21 21l-4.35-4.35"/>
-                </svg>
-                <input type="text" id="search-input" placeholder="Buscar jogos..." class="form-input pl-12">
-            </div>
-        </section>
-
-        <!-- Games Grid -->
-        <section id="games-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-in stagger-4"></section>
-
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-16">
-            <svg class="mx-auto mb-4" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="1">
-                <rect x="2" y="6" width="20" height="12" rx="2"/>
-                <path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
-            </svg>
-            <p class="text-lg" style="color: var(--fg-muted);">Nenhum jogo encontrado</p>
-            <p class="text-sm mt-2" style="color: var(--fg-muted);">Adicione jogos ao seu backlog!</p>
-        </div>
+    <div id="tab-dashboard">
+      <div class="dash-toolbar">
+        <div class="dash-toolbar-title">Visão Geral</div>
+        <button class="btn btn-ghost btn-sm" id="edit-dash-btn" onclick="toggleEditMode()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Personalizar
+        </button>
+        <button class="btn btn-accent btn-sm" id="add-widget-btn" style="display:none" onclick="openWidgetPicker()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Adicionar Widget
+        </button>
+        <button class="btn btn-ghost btn-sm" id="save-dash-btn" style="display:none" onclick="toggleEditMode()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          Salvar Layout
+        </button>
+      </div>
+      <div id="dashboard-grid"></div>
     </div>
 
-    <!-- Game Modal -->
-    <div class="modal-overlay" id="modal">
-        <div class="modal-content">
-            <div class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="font-display text-xl font-bold" id="modal-title">Adicionar Jogo</h2>
-                    <button onclick="closeModal()" class="btn-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <form id="game-form" class="space-y-4">
-                    <input type="hidden" id="game-id">
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Capa do Jogo</label>
-                        <div class="mb-2">
-                            <span class="cover-tab active" onclick="switchCoverInput('url')">Link URL</span>
-                            <span class="cover-tab" onclick="switchCoverInput('file')">Upload Arquivo</span>
-                        </div>
-                        
-                        <div id="cover-url-group" class="cover-input-group active">
-                            <input type="url" id="game-cover-url" class="form-input" placeholder="https://exemplo.com/imagem.jpg">
-                        </div>
-
-                        <div id="cover-file-group" class="cover-input-group">
-                            <div class="cover-upload" onclick="document.getElementById('cover-input').click()">
-                                <input type="file" id="cover-input" accept="image/*" class="hidden" onchange="handleCoverUpload(event)">
-                                <div id="cover-placeholder">
-                                    <svg class="mx-auto mb-2" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="1.5">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                                        <path d="M21 15l-5-5L5 21"/>
-                                    </svg>
-                                    <p class="text-sm" style="color: var(--fg-muted);">Clique para fazer upload</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="cover-preview-container" class="hidden mt-3 p-3 rounded-lg" style="background: var(--bg-card); text-align: center;">
-                            <img id="cover-preview" class="cover-preview" alt="Preview">
-                            <button type="button" onclick="clearCoverPreview()" class="text-xs mt-2 text-red-400 hover:text-red-300">Remover Imagem</button>
-                        </div>
-                        <input type="hidden" id="game-cover">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Nome do Jogo</label>
-                        <input type="text" id="game-name" class="form-input" placeholder="Ex: Dark Souls" required>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Genero</label>
-                        <select id="game-genre" class="form-input form-select" required></select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Plataforma</label>
-                        <select id="game-platform" class="form-input form-select" required></select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Status</label>
-                        <select id="game-status" class="form-input form-select" required></select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Horas Jogadas</label>
-                        <input type="number" id="game-hours" class="form-input" placeholder="Ex: 50" min="0">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Avaliacao (1-10)</label>
-                        <div class="flex gap-2">
-                            <input type="range" id="game-rating" class="flex-1" min="1" max="10" value="5">
-                            <span id="rating-display" class="font-display font-bold w-8 text-center" style="color: var(--accent);">5</span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--fg-muted);">Data de Lancamento</label>
-                        <input type="date" id="game-release" class="form-input">
-                    </div>
-
-                    <div class="flex flex-col gap-3 pt-4">
-                        <div class="flex gap-3">
-                            <button type="button" onclick="closeModal()" class="btn btn-secondary flex-1">Cancelar</button>
-                            <button type="submit" class="btn btn-primary flex-1">Salvar</button>
-                        </div>
-                        <button type="button" id="delete-btn" onclick="deleteGameFromModal()" class="btn btn-danger w-full hidden">Excluir Jogo</button>
-                    </div>
-                </form>
-            </div>
+    <div id="tab-library" style="display:none">
+      <div class="library-toolbar">
+        <div class="filter-chips" id="filter-chips">
+          <button class="chip active" data-filter="all" onclick="setFilter('all')">Todos</button>
         </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div class="modal-overlay" id="settings-modal">
-        <div class="modal-content" style="max-width: 700px;">
-            <div class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="font-display text-xl font-bold">Configuracoes</h2>
-                    <button onclick="closeSettingsModal()" class="btn-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <p class="text-sm mb-6" style="color: var(--fg-muted);">Gerencie as opcoes disponiveis nos formularios de jogos.</p>
-
-                <!-- Generos -->
-                <div class="settings-section">
-                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">GENROS</h3>
-                    <div id="genre-list"></div>
-                    <div class="add-item-row">
-                        <input type="text" id="new-genre" class="form-input" placeholder="Novo genero...">
-                        <button onclick="addConfigItem('genres', 'new-genre')" class="btn btn-primary" style="padding: 12px 16px;">Adicionar</button>
-                    </div>
-                </div>
-
-                <!-- Plataformas -->
-                <div class="settings-section">
-                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">PLATAFORMAS</h3>
-                    <div id="platform-list"></div>
-                    <div class="add-item-row">
-                        <input type="text" id="new-platform-name" class="form-input" placeholder="Nome (ex: PC (Steam))">
-                        <input type="text" id="new-platform-icon" class="form-input" placeholder="URL do Icone (opcional)">
-                        <button onclick="addPlatform()" class="btn btn-primary" style="padding: 12px 16px;">Salvar</button>
-                    </div>
-                </div>
-
-                <!-- Status -->
-                <div class="settings-section">
-                    <h3 class="font-display text-sm font-bold mb-3" style="color: var(--accent);">STATUS</h3>
-                    <div id="status-list"></div>
-                    <div class="add-item-row">
-                        <input type="text" id="new-status" class="form-input" placeholder="Novo status...">
-                        <button onclick="addConfigItem('statuses', 'new-status')" class="btn btn-primary" style="padding: 12px 16px;">Adicionar</button>
-                    </div>
-                </div>
-
-                <div class="flex justify-end mt-6">
-                    <button onclick="closeSettingsModal()" class="btn btn-primary">Concluido</button>
-                </div>
-            </div>
+        <div class="library-toolbar-right">
+          <div class="view-toggle">
+            <button class="view-btn active" id="view-grid-btn" onclick="setView('grid')" title="Grade">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button class="view-btn" id="view-table-btn" onclick="setView('table')" title="Tabela">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+          </div>
         </div>
+      </div>
+      <div id="library-content"></div>
     </div>
+  </div>
+</div>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="delete-modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="p-6 text-center">
-                <div class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style="background: rgba(255, 71, 87, 0.1);">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        <line x1="10" y1="11" x2="10" y2="17"/>
-                        <line x1="14" y1="11" x2="14" y2="17"/>
-                    </svg>
-                </div>
-                <h3 class="font-display text-lg font-bold mb-2">Excluir Jogo</h3>
-                <p class="text-sm mb-6" style="color: var(--fg-muted);">Tem certeza que deseja excluir este jogo? Esta acao nao pode ser desfeita.</p>
-                <div class="flex gap-3">
-                    <button onclick="closeDeleteModal()" class="btn btn-secondary flex-1">Cancelar</button>
-                    <button onclick="confirmDelete()" class="btn btn-danger flex-1">Excluir</button>
-                </div>
-            </div>
+<!-- GAME MODAL -->
+<div class="overlay" id="game-modal">
+  <div class="modal">
+    <div class="modal-inner">
+      <div class="modal-hdr">
+        <h2 id="modal-title">Adicionar Jogo</h2>
+        <button class="icon-btn" onclick="closeGameModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Capa do Jogo</div>
+        <div class="cover-tabs">
+          <button class="ctab active" onclick="switchCoverTab('url')">URL</button>
+          <button class="ctab" onclick="switchCoverTab('file')">Upload</button>
         </div>
+        <div id="ctab-url"><input class="form-control" id="cover-url" type="url" placeholder="https://..." oninput="previewCoverUrl()"></div>
+        <div id="ctab-file" style="display:none">
+          <div class="upload-zone" onclick="document.getElementById('cover-file').click()">
+            <input type="file" id="cover-file" accept="image/*" style="display:none" onchange="handleCoverUpload(event)">
+            Clique para selecionar imagem
+          </div>
+        </div>
+        <div class="cover-preview-box" id="cover-preview-box">
+          <img id="cover-preview" src="" alt="Preview">
+          <span class="rm-cover" onclick="clearCoverPreview()">Remover imagem</span>
+        </div>
+        <input type="hidden" id="cover-data">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="g-name">Nome do Jogo *</label>
+        <input class="form-control" id="g-name" type="text" placeholder="Ex: Dark Souls">
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label class="form-label" for="g-genre">Gênero</label>
+          <select class="form-control" id="g-genre"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="g-platform">Plataforma</label>
+          <select class="form-control" id="g-platform"></select>
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label class="form-label" for="g-status">Status</label>
+          <select class="form-control" id="g-status"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="g-hours">Horas Jogadas</label>
+          <input class="form-control" id="g-hours" type="number" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Avaliação (1–10)</div>
+        <div class="rating-row">
+          <input type="range" id="g-rating" min="1" max="10" value="5" oninput="document.getElementById('rval').textContent=this.value">
+          <span class="rating-num" id="rval">5</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="g-release">Data de Lançamento</label>
+        <input class="form-control" id="g-release" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="g-notes">Notas Pessoais</label>
+        <textarea class="form-control" id="g-notes" rows="2" placeholder="Suas impressões sobre o jogo..."></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeGameModal()">Cancelar</button>
+        <button class="btn btn-accent" onclick="saveGame()">Salvar</button>
+      </div>
+      <div id="delete-action" style="display:none;margin-top:10px">
+        <button class="btn btn-danger-sm" style="width:100%;justify-content:center;padding:10px" onclick="askDeleteGame()">Excluir Jogo</button>
+      </div>
+      <input type="hidden" id="edit-id">
     </div>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"><p id="toast-message"></p></div>
-
-    <script>
-        // ==================== COLE SUA CONFIGURACAO DO FIREBASE AQUI ====================
-        const firebaseConfig = {
-            apiKey: "AIzaSyCL6mxp6RY4IR5vH6FKG67KAlZAi_fmjIM",
-            authDomain: "gaming-backlog-g.firebaseapp.com",
-            projectId: "gaming-backlog-g",
-            storageBucket: "gaming-backlog-g.firebasestorage.app",
-            messagingSenderId: "462908123438",
-            appId: "1:462908123438:web:3c7c714c9c2bc32d9672bf"
-        };
-        // ==================================================================================
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        // Default configuration
-        const defaultConfig = {
-            genres: [
-                'Acao/Aventura RPG', 'Soulslike', 'Hack n Slash', 'RPG de Turno',
-                'Acao/Aventura FPS', 'Plataforma Terror', 'Plataforma Acao/Aventura',
-                'Corrida', 'Simulacao', 'Historia'
-            ],
-            platforms: [
-                { name: 'PC (Steam)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/1024px-Steam_icon_logo.svg.png' },
-                { name: 'PC (Epic Games)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/1024px-Epic_Games_logo.svg.png' },
-                { name: 'PC (GOG)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/GOG_logo.svg/1024px-GOG_logo.svg.png' },
-                { name: 'PC (Hydra)', icon: '' },
-                { name: 'PC (Ubisoft)', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Ubisoft_logo.svg/1024px-Ubisoft_logo.svg.png' },
-                { name: 'Xbox 360', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/1024px-Xbox_360_logo.svg.png' },
-                { name: 'Playstation 2', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/PlayStation_2_logo.svg/1024px-PlayStation_2_logo.svg.png' }
-            ],
-            statuses: [
-                'Nao Jogado', 'Jogando', 'Voltarei Para Zerar', 'Historia Completa',
-                'Zeradasso', 'Dropei mas Voltarei', 'Dropei desta Merda', 'Passatempo'
-            ]
-        };
-
-        const initialGames = [
-            { id: 1, name: "Dark Souls", cover: "https://assets.nuuvem.com/image/upload/t_boxshot_big/v1/products/5b0467082a1c6e250aceff3f/boxshots/z028ub36xwlti8i8uye7.jpg", genre: "Soulslike", platform: "PC (Steam)", status: "Jogando", hours: null, rating: null, release: "2011-09-22" },
-            { id: 2, name: "Assassin's Creed Chronicles China", cover: "https://cdn1.epicgames.com/offer/f8c4ac7957164721802514c6fc99e66d/ACCC_StorePortrait_1200x1600_1200x1600-ad2c7ccbe4913a324078692b9492e3eb", genre: "Plataforma Acao/Aventura", platform: "PC (Ubisoft)", status: "Historia Completa", hours: null, rating: 3, release: "2015-04-21" },
-            { id: 3, name: "Assassin's Creed Valhalla", cover: "https://upload.wikimedia.org/wikipedia/pt/e/e9/Assassins_Creed_Valhalla_capa.png", genre: "Acao/Aventura RPG", platform: "PC (Ubisoft)", status: "Dropei mas Voltarei", hours: 70, rating: null, release: "2020-11-10" },
-            { id: 4, name: "Black Myth Wukong", cover: "https://cdn1.epicgames.com/spt-assets/ca9ef1bcf2f54043baac351366aec677/black-myth-wukong-jjjfw.png", genre: "Hack n Slash", platform: "PC (Steam)", status: "Voltarei Para Zerar", hours: 168, rating: 8, release: "2024-08-20" },
-            { id: 5, name: "Clair Obscure: Expedition 33", cover: "https://i.scdn.co/image/ab67616d0000b2736e2563012d66edb8f5ba4086", genre: "RPG de Turno", platform: "PC (Hydra)", status: "Voltarei Para Zerar", hours: 28, rating: 9, release: "2025-04-24" },
-            { id: 6, name: "Far Cry 3", cover: "https://upload.wikimedia.org/wikipedia/pt/5/59/Far_cry_3_box_art.jpg", genre: "Acao/Aventura FPS", platform: "PC (Ubisoft)", status: "Voltarei Para Zerar", hours: null, rating: 7, release: "2012-11-29" },
-            { id: 7, name: "Ghost of Tsushima", cover: "https://cdn1.epicgames.com/offer/6e6aa039c73347b885803de65ac5d3db/EGS_GhostofTsushima_SuckerPunchProductions_S2_1200x1600-e23e02c1d70be7b528dba50860f87d39", genre: "Acao/Aventura RPG", platform: "PC (Hydra)", status: "Zeradasso", hours: 45, rating: 7, release: "2020-07-17" },
-            { id: 8, name: "Little Nightmares", cover: "https://m.media-amazon.com/images/I/91HQ+aAlwTL._UF1000,1000_QL80_.jpg", genre: "Plataforma Terror", platform: "PC (Hydra)", status: "Historia Completa", hours: 9, rating: 5, release: "2017-04-28" },
-            { id: 9, name: "Red Dead Redemption", cover: "https://upload.wikimedia.org/wikipedia/pt/f/f3/Red_Dead_Redemption_capa.png", genre: "Acao/Aventura RPG", platform: "PC (Hydra)", status: "Historia Completa", hours: null, rating: 8, release: "2010-05-18" },
-            { id: 10, name: "Red Dead Redemption II", cover: "https://image.api.playstation.com/gs2-sec/appkgo/prod/CUSA08519_00/12/i_3da1cf7c41dc7652f9b639e1680d96436773658668c7dc3930c441291095713b/i/icon0.png", genre: "Acao/Aventura RPG", platform: "PC (Steam)", status: "Voltarei Para Zerar", hours: 266, rating: 10, release: "2018-10-26" },
-            { id: 11, name: "The Witcher: Enhanced Edition", cover: "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co7mue.jpg", genre: "Acao/Aventura RPG", platform: "PC (Steam)", status: "Zeradasso", hours: 77, rating: 6, release: "2007-10-26" }
-        ];
-
-        // State
-        let games = [];
-        let config = { genres: [], platforms: [], statuses: [] };
-        let currentFilter = 'all';
-        let searchQuery = '';
-        let deleteGameId = null;
-        let currentUser = null;
-        let unsubscribers = [];
-
-        // ==================== AUTH FUNCTIONS ====================
-
-        function switchAuthTab(tab) {
-            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
-            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
-            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-
-            auth.signInWithEmailAndPassword(email, password)
-                .then(() => showToast('Login realizado!', 'success'))
-                .catch(err => showToast('Erro: ' + translateError(err.code), 'error'));
-        }
-
-        function handleRegister(e) {
-            e.preventDefault();
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-
-            auth.createUserWithEmailAndPassword(email, password)
-                .then(() => showToast('Conta criada com sucesso!', 'success'))
-                .catch(err => showToast('Erro: ' + translateError(err.code), 'error'));
-        }
-
-        function handleLogout() {
-            auth.signOut();
-        }
-
-        function translateError(code) {
-            const errors = {
-                'auth/email-already-in-use': 'Este email ja esta em uso',
-                'auth/invalid-email': 'Email invalido',
-                'auth/weak-password': 'Senha muito fraca (minimo 6 caracteres)',
-                'auth/user-not-found': 'Usuario nao encontrado',
-                'auth/wrong-password': 'Senha incorreta'
-            };
-            return errors[code] || code;
-        }
-
-        // Auth State Observer
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                showApp();
-                loadData();
-            } else {
-                currentUser = null;
-                showAuth();
-                cleanupListeners();
-            }
-        });
-
-        function showAuth() {
-            document.getElementById('auth-screen').classList.remove('hidden');
-            document.getElementById('app-screen').classList.add('hidden');
-        }
-
-        function showApp() {
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('app-screen').classList.remove('hidden');
-            
-            const email = currentUser.email;
-            const initial = email.charAt(0).toUpperCase();
-            document.getElementById('user-avatar').textContent = initial;
-            document.getElementById('user-name').textContent = email.split('@')[0];
-        }
-
-        function cleanupListeners() {
-            unsubscribers.forEach(unsub => unsub());
-            unsubscribers = [];
-        }
-
-        // ==================== DATA FUNCTIONS ====================
-
-        function loadData() {
-            const userRef = db.collection('users').doc(currentUser.uid);
-
-            // Listen for games changes
-            const unsubGames = userRef.collection('games').onSnapshot(snapshot => {
-                games = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderGames();
-                updateStats();
-            }, err => console.error('Error loading games:', err));
-            unsubscribers.push(unsubGames);
-
-            // Listen for config changes
-            const unsubConfig = userRef.collection('config').doc('main').onSnapshot(doc => {
-                if (doc.exists) {
-                    config = doc.data();
-                } else {
-                    config = JSON.parse(JSON.stringify(defaultConfig));
-                    userRef.collection('config').doc('main').set(config);
-                }
-                populateSelects();
-                renderFilterChips();
-            }, err => console.error('Error loading config:', err));
-            unsubscribers.push(unsubConfig);
-        }
-
-        function saveGame(gameData) {
-            const ref = db.collection('users').doc(currentUser.uid).collection('games');
-            
-            if (gameData.id && typeof gameData.id === 'string') {
-                // Update existing
-                ref.doc(gameData.id).update(gameData);
-            } else {
-                // Create new
-                ref.add(gameData);
-            }
-        }
-
-        function deleteGame(id) {
-            db.collection('users').doc(currentUser.uid).collection('games').doc(id).delete();
-        }
-
-        function saveConfig() {
-            db.collection('users').doc(currentUser.uid).collection('config').doc('main').set(config);
-        }
-
-        // ==================== UI FUNCTIONS ====================
-
-        function populateSelects() {
-            const genreSelect = document.getElementById('game-genre');
-            const platformSelect = document.getElementById('game-platform');
-            const statusSelect = document.getElementById('game-status');
-
-            genreSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                config.genres.map(g => `<option value="${g}">${g}</option>`).join('');
-
-            platformSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                config.platforms.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-
-            statusSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                config.statuses.map(s => `<option value="${s}">${s}</option>`).join('');
-        }
-
-        function renderFilterChips() {
-            const container = document.getElementById('filter-container');
-            const chipsHTML = config.statuses.map(status => 
-                `<button class="filter-chip" data-filter="${status}">${status}</button>`
-            ).join('');
-            
-            container.innerHTML = `
-                <span class="text-sm font-medium" style="color: var(--fg-muted);">Filtrar:</span>
-                <button class="filter-chip active" data-filter="all">Todos</button>
-                ${chipsHTML}
-            `;
-
-            container.querySelectorAll('.filter-chip').forEach(chip => {
-                chip.addEventListener('click', () => {
-                    container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-                    chip.classList.add('active');
-                    currentFilter = chip.dataset.filter;
-                    renderGames();
-                });
-            });
-        }
-
-        // Setup event listeners
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            searchQuery = e.target.value.toLowerCase();
-            renderGames();
-        });
-
-        document.getElementById('game-rating').addEventListener('input', (e) => {
-            document.getElementById('rating-display').textContent = e.target.value;
-        });
-
-        document.getElementById('game-form').addEventListener('submit', handleFormSubmit);
-
-        ['modal', 'settings-modal', 'delete-modal'].forEach(id => {
-            document.getElementById(id).addEventListener('click', (e) => {
-                if (e.target.id === id) {
-                    if (id === 'modal') closeModal();
-                    else if (id === 'settings-modal') closeSettingsModal();
-                    else closeDeleteModal();
-                }
-            });
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                closeSettingsModal();
-                closeDeleteModal();
-            }
-        });
-
-        function getFilteredGames() {
-            return games.filter(game => {
-                const matchesFilter = currentFilter === 'all' || game.status === currentFilter;
-                const matchesSearch = game.name.toLowerCase().includes(searchQuery);
-                return matchesFilter && matchesSearch;
-            });
-        }
-
-        function renderGames() {
-            const grid = document.getElementById('games-grid');
-            const emptyState = document.getElementById('empty-state');
-            const filteredGames = getFilteredGames();
-
-            if (filteredGames.length === 0) {
-                grid.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            emptyState.classList.add('hidden');
-            grid.innerHTML = filteredGames.map((game, index) => createGameCard(game, index)).join('');
-
-            grid.querySelectorAll('.game-card').forEach((card, i) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.3s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, i * 50);
-            });
-        }
-
-        function getPlatformData(platformName) {
-            return config.platforms.find(p => p.name === platformName) || { name: platformName, icon: '' };
-        }
-
-        function createGameCard(game, index) {
-            const statusClass = getStatusClass(game.status);
-            const ratingWidth = game.rating ? game.rating * 10 : 0;
-            const hoursDisplay = game.hours ? `${game.hours}h` : '--';
-            const platformData = getPlatformData(game.platform);
-            
-            let platformHtml = `<div class="platform-display">`;
-            if (platformData.icon) {
-                platformHtml += `<img src="${platformData.icon}" class="platform-icon" onerror="this.style.display='none'">`;
-            }
-            platformHtml += `<span>${game.platform}</span></div>`;
-
-            return `
-                <div class="game-card" data-id="${game.id}" onclick="editGame('${game.id}')">
-                    <div class="relative overflow-hidden">
-                        <img src="${game.cover}" alt="${game.name}" class="cover" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 400%22%3E%3Crect fill=%22%231a1a24%22 width=%22300%22 height=%22400%22/%3E%3Ctext fill=%22%236b6b7b%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22%3ESem Capa%3C/text%3E%3C/svg%3E'">
-                        <div class="absolute top-2 left-2">
-                            <span class="status-badge ${statusClass}">${game.status}</span>
-                        </div>
-                        <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-                            <p class="font-display text-sm font-bold truncate">${game.name}</p>
-                            <p class="text-xs mt-1" style="color: var(--fg-muted);">${game.genre}</p>
-                        </div>
-                    </div>
-                    <div class="p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="text-xs" style="color: var(--fg-muted);">
-                                ${platformHtml}
-                            </div>
-                            <span class="text-xs font-medium">${hoursDisplay}</span>
-                        </div>
-                        ${game.rating ? `
-                            <div class="rating">
-                                <div class="rating-bar"><div class="rating-fill" style="width: ${ratingWidth}%"></div></div>
-                                <span class="text-xs ml-2 font-bold" style="color: var(--accent);">${game.rating}/10</span>
-                            </div>
-                        ` : `<p class="text-xs" style="color: var(--fg-muted);">Sem avaliacao</p>`}
-                    </div>
-                </div>
-            `;
-        }
-
-        function getStatusClass(status) {
-            const statusMap = {
-                'Jogando': 'status-jogando',
-                'Zeradasso': 'status-zeradasso',
-                'Historia Completa': 'status-historia',
-                'Voltarei Para Zerar': 'status-voltarei',
-                'Dropei mas Voltarei': 'status-dropei',
-                'Dropei desta Merda': 'status-dropei',
-                'Nao Jogado': 'status-nao',
-                'Passatempo': 'status-voltarei'
-            };
-            return statusMap[status] || 'status-nao';
-        }
-
-        function updateStats() {
-            const total = games.length;
-            const hours = games.reduce((sum, game) => sum + (game.hours || 0), 0);
-            const completed = games.filter(g => g.status === 'Zeradasso').length;
-            const storyComplete = games.filter(g => g.status === 'Historia Completa').length;
-            const playing = games.filter(g => g.status === 'Jogando').length;
-
-            document.getElementById('stat-total').textContent = total;
-            document.getElementById('stat-hours').textContent = hours.toLocaleString();
-            document.getElementById('stat-completed').textContent = completed;
-            document.getElementById('stat-story').textContent = storyComplete;
-            document.getElementById('stat-playing').textContent = playing;
-        }
-
-        function switchCoverInput(type) {
-            document.querySelectorAll('.cover-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.cover-tab[onclick="switchCoverInput('${type}')"]`).classList.add('active');
-
-            document.getElementById('cover-url-group').classList.remove('active');
-            document.getElementById('cover-file-group').classList.remove('active');
-
-            if (type === 'url') {
-                document.getElementById('cover-url-group').classList.add('active');
-            } else {
-                document.getElementById('cover-file-group').classList.add('active');
-            }
-        }
-
-        function openModal() {
-            document.getElementById('modal-title').textContent = 'Adicionar Jogo';
-            document.getElementById('game-form').reset();
-            document.getElementById('game-id').value = '';
-            document.getElementById('game-cover').value = '';
-            document.getElementById('game-cover-url').value = '';
-            document.getElementById('delete-btn').classList.add('hidden');
-            
-            clearCoverPreview();
-            switchCoverInput('url');
-            document.getElementById('rating-display').textContent = '5';
-            document.getElementById('modal').classList.add('active');
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.remove('active');
-        }
-
-        function handleCoverUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result;
-                    document.getElementById('game-cover').value = base64;
-                    document.getElementById('cover-preview').src = base64;
-                    document.getElementById('cover-preview-container').classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function clearCoverPreview() {
-            document.getElementById('cover-preview-container').classList.add('hidden');
-            document.getElementById('cover-preview').src = '';
-            document.getElementById('game-cover').value = '';
-            document.getElementById('cover-input').value = '';
-        }
-
-        function editGame(id) {
-            const game = games.find(g => g.id === id);
-            if (!game) return;
-
-            document.getElementById('modal-title').textContent = 'Editar Jogo';
-            document.getElementById('game-id').value = game.id;
-            document.getElementById('game-name').value = game.name;
-            document.getElementById('game-genre').value = game.genre;
-            document.getElementById('game-platform').value = game.platform;
-            document.getElementById('game-status').value = game.status;
-            document.getElementById('game-hours').value = game.hours || '';
-            document.getElementById('game-rating').value = game.rating || 5;
-            document.getElementById('rating-display').textContent = game.rating || 5;
-            document.getElementById('game-release').value = game.release || '';
-            document.getElementById('delete-btn').classList.remove('hidden');
-
-            if (game.cover) {
-                document.getElementById('game-cover').value = game.cover;
-                document.getElementById('cover-preview').src = game.cover;
-                document.getElementById('cover-preview-container').classList.remove('hidden');
-                if (game.cover.startsWith('http')) {
-                    document.getElementById('game-cover-url').value = game.cover;
-                    switchCoverInput('url');
-                } else {
-                    document.getElementById('game-cover-url').value = '';
-                    switchCoverInput('file');
-                }
-            } else {
-                clearCoverPreview();
-                switchCoverInput('url');
-            }
-
-            document.getElementById('modal').classList.add('active');
-        }
-
-        function handleFormSubmit(e) {
-            e.preventDefault();
-
-            const id = document.getElementById('game-id').value;
-            
-            let coverSource = document.getElementById('game-cover-url').value.trim();
-            if (!coverSource) {
-                coverSource = document.getElementById('game-cover').value;
-            }
-
-            const gameData = {
-                name: document.getElementById('game-name').value,
-                cover: coverSource,
-                genre: document.getElementById('game-genre').value,
-                platform: document.getElementById('game-platform').value,
-                status: document.getElementById('game-status').value,
-                hours: parseInt(document.getElementById('game-hours').value) || null,
-                rating: parseInt(document.getElementById('game-rating').value),
-                release: document.getElementById('game-release').value || null
-            };
-
-            if (id) {
-                gameData.id = id;
-            }
-
-            saveGame(gameData);
-            closeModal();
-            showToast('Jogo salvo!', 'success');
-        }
-
-        function deleteGameFromModal() {
-            const id = document.getElementById('game-id').value;
-            if (id) {
-                deleteGameId = id;
-                document.getElementById('delete-modal').classList.add('active');
-            }
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('delete-modal').classList.remove('active');
-            deleteGameId = null;
-        }
-
-        function confirmDelete() {
-            if (deleteGameId) {
-                deleteGame(deleteGameId);
-                showToast('Jogo excluido!', 'success');
-            }
-            closeDeleteModal();
-            closeModal();
-        }
-
-        // Settings Functions
-        function openSettingsModal() {
-            renderConfigLists();
-            document.getElementById('settings-modal').classList.add('active');
-        }
-
-        function closeSettingsModal() {
-            document.getElementById('settings-modal').classList.remove('active');
-        }
-
-        function renderConfigLists() {
-            renderConfigSection('genres', 'genre-list');
-            renderConfigSection('platforms', 'platform-list');
-            renderConfigSection('statuses', 'status-list');
-        }
-
-        function renderConfigSection(type, containerId) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = config[type].map(item => {
-                const displayName = (typeof item === 'object') ? item.name : item;
-                const iconHtml = (typeof item === 'object' && item.icon) 
-                    ? `<img src="${item.icon}" class="config-item-icon" onerror="this.style.display='none'">` 
-                    : '';
-
-                return `
-                    <div class="config-item">
-                        <div style="display:flex; align-items:center;">
-                            ${iconHtml}
-                            <span>${displayName}</span>
-                        </div>
-                        <button class="config-delete-btn" onclick="removeConfigItem('${type}', '${displayName}')" title="Remover">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6L6 18M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function addConfigItem(type, inputId) {
-            const input = document.getElementById(inputId);
-            const value = input.value.trim();
-            
-            if (!value) {
-                showToast('Digite um valor valido!', 'error');
-                return;
-            }
-
-            const exists = config[type].some(item => {
-                return (typeof item === 'object') ? item.name === value : item === value;
-            });
-
-            if (exists) {
-                showToast('Este item ja existe!', 'error');
-                return;
-            }
-
-            config[type].push(value);
-            saveConfig();
-            renderConfigLists();
-            populateSelects();
-            
-            if (type === 'statuses') {
-                renderFilterChips();
-            }
-            
-            input.value = '';
-            showToast('Item adicionado!', 'success');
-        }
-
-        function addPlatform() {
-            const nameInput = document.getElementById('new-platform-name');
-            const iconInput = document.getElementById('new-platform-icon');
-            const name = nameInput.value.trim();
-            const icon = iconInput.value.trim();
-
-            if (!name) {
-                showToast('O nome da plataforma e obrigatorio!', 'error');
-                return;
-            }
-
-            const existingIndex = config.platforms.findIndex(p => p.name === name);
-
-            if (existingIndex !== -1) {
-                config.platforms[existingIndex].icon = icon;
-                showToast('Plataforma atualizada!', 'success');
-            } else {
-                config.platforms.push({ name: name, icon: icon });
-                showToast('Plataforma adicionada!', 'success');
-            }
-
-            saveConfig();
-            renderConfigLists();
-            populateSelects();
-            renderGames();
-
-            nameInput.value = '';
-            iconInput.value = '';
-        }
-
-        function removeConfigItem(type, value) {
-            if (type === 'platforms') {
-                config[type] = config[type].filter(item => item.name !== value);
-            } else {
-                config[type] = config[type].filter(item => item !== value);
-            }
-            
-            saveConfig();
-            renderConfigLists();
-            populateSelects();
-            
-            if (type === 'statuses') {
-                renderFilterChips();
-            }
-            if (type === 'platforms') {
-                renderGames();
-            }
-            
-            showToast('Item removido!', 'success');
-        }
-
-        function showToast(message, type) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toast-message');
-            toastMessage.textContent = message;
-            toast.className = `toast ${type}`;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-    </script>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="overlay" id="del-modal">
+  <div class="modal modal-sm">
+    <div class="modal-inner">
+      <div class="del-confirm">
+        <div class="del-icon-wrap">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        </div>
+        <h3>Excluir Jogo</h3>
+        <p>Esta ação não pode ser desfeita.</p>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="closeDel()">Cancelar</button>
+          <button class="btn btn-danger-sm" style="flex:1;justify-content:center;padding:11px" onclick="confirmDelete()">Excluir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WIDGET PICKER -->
+<div class="overlay" id="widget-picker-modal">
+  <div class="modal">
+    <div class="modal-inner">
+      <div class="modal-hdr">
+        <h2>Adicionar Widget</h2>
+        <button class="icon-btn" onclick="closeWidgetPicker()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--fg3)">Escolha os widgets que deseja exibir no seu dashboard.</p>
+      <div class="widget-picker-grid" id="widget-picker-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="overlay" id="settings-modal">
+  <div class="modal modal-lg">
+    <div class="modal-inner">
+      <div class="modal-hdr">
+        <h2>Configurações</h2>
+        <button class="icon-btn" onclick="closeSettings()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="settings-section">
+        <h3>Gêneros</h3>
+        <div id="cfg-genres"></div>
+        <div class="add-row">
+          <input class="form-control" id="new-genre" placeholder="Novo gênero...">
+          <button class="btn btn-accent btn-sm" onclick="addGenre()">Adicionar</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Plataformas</h3>
+        <div id="cfg-platforms"></div>
+        <div class="add-row">
+          <input class="form-control" id="new-plat-name" placeholder="Nome (ex: PS5)">
+          <input class="form-control" id="new-plat-icon" placeholder="URL do ícone (opcional)">
+          <button class="btn btn-accent btn-sm" onclick="addPlatform()">Salvar</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Status</h3>
+        <div id="cfg-statuses"></div>
+        <div class="add-row">
+          <input class="form-control" id="new-status" placeholder="Novo status...">
+          <button class="btn btn-accent btn-sm" onclick="addStatus()">Adicionar</button>
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:8px">
+        <button class="btn btn-accent" onclick="closeSettings()">Concluído</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// FIREBASE CONFIG — cole suas chaves aqui
+// ═══════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyBpH2CIyBOkj0KdtJ5P1Kq2SAR8lnzFul8",
+  authDomain: "gm-app-66471.firebaseapp.com",
+  projectId: "gm-app-66471",
+  storageBucket: "gm-app-66471.firebasestorage.app",
+  messagingSenderId: "1044768935238",
+  appId: "1:1044768935238:web:ee63d8b870ea5b59e5a947"
+};
+
+// ═══════════════════════════════════════════════════
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const DEF_CONFIG = {
+  genres: ['Ação/Aventura RPG','Soulslike','Hack \'n\' Slash','RPG de Turno','FPS','Plataforma','Terror','Corrida','Simulação','Estratégia'],
+  platforms: [
+    {name:'PC (Steam)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/64px-Steam_icon_logo.svg.png'},
+    {name:'PC (Epic)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/64px-Epic_Games_logo.svg.png'},
+    {name:'PC (GOG)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/GOG_logo.svg/64px-GOG_logo.svg.png'},
+    {name:'PC (Hydra)',icon:''},{name:'PC (Ubisoft)',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Ubisoft_logo.svg/64px-Ubisoft_logo.svg.png'},
+    {name:'Xbox 360',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_360_logo.svg/64px-Xbox_360_logo.svg.png'},
+    {name:'PlayStation 2',icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/PlayStation_2_logo.svg/64px-PlayStation_2_logo.svg.png'},
+    {name:'PlayStation 4',icon:''},{name:'Nintendo Switch',icon:''}
+  ],
+  statuses: ['Não Jogado','Jogando','Voltarei Para Zerar','História Completa','Zeradasso','Dropei mas Voltarei','Dropei desta Merda','Passatempo']
+};
+const DEF_DASHBOARD = ['stat-total','stat-hours','stat-completed','stat-playing','chart-status','chart-genre','recent-games','top-rated'];
+const STATUS_CSS = {'Jogando':'s-playing','Zeradasso':'s-completed','História Completa':'s-story','Voltarei Para Zerar':'s-backlog','Dropei mas Voltarei':'s-dropped','Dropei desta Merda':'s-dropped','Não Jogado':'s-inactive','Passatempo':'s-inactive'};
+const STATUS_DOT = {'Jogando':'#22d994','Zeradasso':'#f5c842','História Completa':'#4ab3f4','Voltarei Para Zerar':'#ff8c42','Dropei mas Voltarei':'#ff5572','Dropei desta Merda':'#ff5572','Não Jogado':'#5a5a7a','Passatempo':'#5a5a7a'};
+const WIDGET_DEFS = {
+  'stat-total':{name:'Total de Jogos',desc:'Contador geral',icon:'🎮',w:'w-1',h:''},
+  'stat-hours':{name:'Horas Totais',desc:'Soma de horas jogadas',icon:'⏱️',w:'w-1',h:''},
+  'stat-completed':{name:'Zerados',desc:'Jogos 100% finalizados',icon:'🏆',w:'w-1',h:''},
+  'stat-playing':{name:'Jogando',desc:'Em progresso agora',icon:'▶️',w:'w-1',h:''},
+  'stat-rating':{name:'Nota Média',desc:'Média de avaliações',icon:'⭐',w:'w-1',h:''},
+  'stat-dropped':{name:'Abandonados',desc:'Jogos dropados',icon:'❌',w:'w-1',h:''},
+  'chart-status':{name:'Por Status',desc:'Gráfico de rosca',icon:'🍩',w:'w-3',h:'w-h3'},
+  'chart-genre':{name:'Por Gênero',desc:'Gráfico de barras',icon:'📊',w:'w-3',h:'w-h3'},
+  'chart-hours':{name:'Horas por Plataforma',desc:'Gráfico de barras',icon:'📈',w:'w-3',h:'w-h3'},
+  'chart-rating':{name:'Distribuição de Notas',desc:'Histograma',icon:'📉',w:'w-3',h:'w-h3'},
+  'recent-games':{name:'Recentes',desc:'Últimos adicionados',icon:'🆕',w:'w-3',h:'w-h2'},
+  'top-rated':{name:'Melhor Avaliados',desc:'Top jogos por nota',icon:'⭐',w:'w-3',h:'w-h2'},
+  'in-progress':{name:'Em Progresso',desc:'Status Jogando',icon:'▶️',w:'w-3',h:'w-h2'},
+  'completion-bar':{name:'Progresso Geral',desc:'Barra de conclusão',icon:'📋',w:'w-5',h:''}
+};
+
+let games=[], config={genres:[],platforms:[],statuses:[]}, dashLayout=[...DEF_DASHBOARD];
+let currentFilter='all', currentView='grid', searchQ='', editMode=false, deleteGameId=null, currentUser=null, charts={};
+
+function fmtDate(iso){if(!iso)return '—';const[y,m,d]=iso.split('-');return `${d}/${m}/${y}`;}
+function ph(){return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 200'%3E%3Crect fill='%231e1e30' width='150' height='200'/%3E%3Ctext fill='%235a5a7a' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='11' font-family='sans-serif'%3ESem Capa%3C/text%3E%3C/svg%3E";}
+function getPlatform(name){return config.platforms.find(p=>p.name===name)||{name:name||'—',icon:''};}
+function toast(msg,type='success'){const t=document.getElementById('toast');const ic=type==='success'?'✓':'✕';t.innerHTML=`<span style="color:${type==='success'?'var(--green)':'var(--red)'}">${ic}</span>${msg}`;t.className='toast '+type+' show';clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);}
+function setSyncStatus(s){const d=document.getElementById('sync-dot'),t=document.getElementById('sync-txt');d.className='sync-dot '+s;t.textContent=s==='synced'?'Salvo':s==='syncing'?'Salvando...':'Offline';}
+function getStatusBadge(s){return `<span class="sbadge ${STATUS_CSS[s]||'s-inactive'}">${s}</span>`;}
+function togglePassVis(){const p=document.getElementById('auth-pass');p.type=p.type==='password'?'text':'password';}
+
+// AUTH
+let authTab='login';
+function setAuthTab(t){authTab=t;document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')));document.getElementById('auth-name-wrap').style.display=t==='register'?'block':'none';document.getElementById('auth-submit-btn').textContent=t==='login'?'Entrar':'Criar Conta';document.getElementById('auth-err').textContent='';}
+function submitAuth(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const errEl=document.getElementById('auth-err');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Preencha todos os campos.';return;}
+  if(authTab==='login'){
+    auth.signInWithEmailAndPassword(email,pass).catch(e=>{errEl.textContent=e.code==='auth/user-not-found'||e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Email ou senha incorretos.':'Erro ao entrar. Tente novamente.';});
+  } else {
+    auth.createUserWithEmailAndPassword(email,pass).then(()=>{const name=document.getElementById('auth-name').value.trim();if(name)auth.currentUser.updateProfile({displayName:name});}).catch(e=>{errEl.textContent=e.code==='auth/email-already-in-use'?'Este email já está cadastrado.':e.code==='auth/weak-password'?'Senha muito curta (mín. 6 caracteres).':'Erro ao criar conta.';});
+  }
+}
+function doSignOut(){auth.signOut();}
+document.getElementById('auth-email').addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();});
+document.getElementById('auth-pass').addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();});
+
+auth.onAuthStateChanged(async user=>{
+  document.getElementById('loading').style.display='none';
+  if(user){
+    currentUser=user;
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('user-name-display').textContent=user.displayName||user.email.split('@')[0];
+    await loadUserData();
+    render();
+  } else {
+    currentUser=null;
+    document.getElementById('auth-screen').style.display='flex';
+    document.getElementById('app').classList.remove('visible');
+    games=[];config={genres:[],platforms:[],statuses:[]};dashLayout=[...DEF_DASHBOARD];
+  }
+});
+
+// FIRESTORE
+function userDoc(col){return db.collection('users').doc(currentUser.uid).collection(col);}
+async function loadUserData(){
+  try{
+    setSyncStatus('syncing');
+    const cfgDoc=await db.collection('users').doc(currentUser.uid).get();
+    if(cfgDoc.exists){const d=cfgDoc.data();config=d.config||JSON.parse(JSON.stringify(DEF_CONFIG));dashLayout=d.dashLayout||[...DEF_DASHBOARD];}
+    else{config=JSON.parse(JSON.stringify(DEF_CONFIG));dashLayout=[...DEF_DASHBOARD];}
+    if(config.platforms&&config.platforms.length&&typeof config.platforms[0]==='string')config.platforms=config.platforms.map(p=>({name:p,icon:''}));
+    const gSnap=await userDoc('games').orderBy('createdAt','desc').get();
+    games=gSnap.docs.map(d=>({id:d.id,...d.data()}));
+    setSyncStatus('synced');
+  } catch(e){console.error(e);setSyncStatus('error');}
+}
+async function saveUserMeta(){if(!currentUser)return;setSyncStatus('syncing');try{await db.collection('users').doc(currentUser.uid).set({config,dashLayout},{merge:true});setSyncStatus('synced');}catch(e){setSyncStatus('error');}}
+async function saveGame_db(gd,id){if(!currentUser)return;setSyncStatus('syncing');try{if(id){await userDoc('games').doc(id).set(gd,{merge:true});setSyncStatus('synced');}else{const ref=await userDoc('games').add({...gd,createdAt:firebase.firestore.FieldValue.serverTimestamp()});setSyncStatus('synced');return ref.id;}}catch(e){setSyncStatus('error');}}
+async function deleteGame_db(id){if(!currentUser)return;setSyncStatus('syncing');try{await userDoc('games').doc(id).delete();setSyncStatus('synced');}catch(e){setSyncStatus('error');}}
+
+// RENDER
+function render(){renderDashboard();renderLibrary();renderFilters();populateSelects();}
+function handleSearch(){searchQ=document.getElementById('search-input').value.toLowerCase();renderLibrary();}
+function getFiltered(){return games.filter(g=>(currentFilter==='all'||g.status===currentFilter)&&(!searchQ||g.name.toLowerCase().includes(searchQ)||(g.genre||'').toLowerCase().includes(searchQ)));}
+
+function switchTab(t){
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('tab-dashboard').style.display=t==='dashboard'?'block':'none';
+  document.getElementById('tab-library').style.display=t==='library'?'block':'none';
+  if(t==='dashboard')renderDashboard();
+}
+
+// DASHBOARD
+function toggleEditMode(){
+  editMode=!editMode;
+  document.getElementById('dashboard-grid').classList.toggle('edit-mode',editMode);
+  document.getElementById('edit-dash-btn').style.display=editMode?'none':'flex';
+  document.getElementById('add-widget-btn').style.display=editMode?'flex':'none';
+  document.getElementById('save-dash-btn').style.display=editMode?'flex':'none';
+  if(!editMode){saveUserMeta();toast('Layout salvo!');}
+  renderDashboard();
+}
+function removeWidget(id){dashLayout=dashLayout.filter(w=>w!==id);destroyChart(id);renderDashboard();}
+function addWidget(id){if(!dashLayout.includes(id)){dashLayout.push(id);renderDashboard();renderWidgetPicker();toast('Widget adicionado!');}}
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function renderDashboard(){
+  const grid=document.getElementById('dashboard-grid');
+  Object.keys(charts).forEach(k=>destroyChart(k));
+  grid.innerHTML='';
+  dashLayout.forEach(wid=>{grid.appendChild(buildWidget(wid));});
+  requestAnimationFrame(()=>{dashLayout.forEach(wid=>{if(wid.startsWith('chart-'))drawChart(wid);});});
+}
+
+function buildWidget(id){
+  const def=WIDGET_DEFS[id];if(!def)return document.createElement('div');
+  const div=document.createElement('div');div.className=`widget ${def.w} ${def.h}`;div.dataset.wid=id;
+  div.innerHTML=`<div class="widget-header"><div class="widget-title">${def.name}</div><button class="widget-remove" onclick="removeWidget('${id}')">✕</button></div>${widgetBody(id)}`;
+  return div;
+}
+
+function widgetBody(id){
+  const total=games.length,hours=games.reduce((s,g)=>s+(g.hours||0),0),completed=games.filter(g=>g.status==='Zeradasso').length,playing=games.filter(g=>g.status==='Jogando').length,dropped=games.filter(g=>g.status==='Dropei desta Merda'||g.status==='Dropei mas Voltarei').length;
+  const rated=games.filter(g=>g.rating),avgRating=rated.length?Math.round(rated.reduce((s,g)=>s+(g.rating||0),0)/rated.length*10)/10:0;
+  switch(id){
+    case 'stat-total':return `<div class="stat-big">${total}</div><div class="stat-label2">jogos no backlog</div>`;
+    case 'stat-hours':return `<div class="stat-big" style="color:var(--green)">${hours.toLocaleString('pt-BR')}</div><div class="stat-label2">horas jogadas</div>`;
+    case 'stat-completed':return `<div class="stat-big" style="color:var(--gold)">${completed}</div><div class="stat-label2">jogos zerados</div>`;
+    case 'stat-playing':return `<div class="stat-big" style="color:var(--accent)">${playing}</div><div class="stat-label2">jogando agora</div>`;
+    case 'stat-rating':return `<div class="stat-big" style="color:var(--gold)">${avgRating||'—'}</div><div class="stat-label2">nota média</div>`;
+    case 'stat-dropped':return `<div class="stat-big" style="color:var(--red)">${dropped}</div><div class="stat-label2">abandonados</div>`;
+    case 'chart-status':case 'chart-genre':case 'chart-hours':case 'chart-rating':
+      return `<div class="chart-wrap"><canvas id="canvas-${id}"></canvas></div>`;
+    case 'recent-games':return buildGameListWidget([...games].slice(0,6));
+    case 'top-rated':return buildGameListWidget([...games].filter(g=>g.rating).sort((a,b)=>b.rating-a.rating).slice(0,6));
+    case 'in-progress':return buildGameListWidget(games.filter(g=>g.status==='Jogando').slice(0,6));
+    case 'completion-bar':{
+      const zd=games.filter(g=>g.status==='Zeradasso'||g.status==='História Completa').length;
+      const pct=total?Math.round(zd/total*100):0;
+      return `<div style="padding:0 16px 16px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--fg2);margin-bottom:6px">
+          <span>Concluídos</span><span style="font-family:'JetBrains Mono',monospace;color:var(--green)">${pct}% — ${zd}/${total}</span>
+        </div>
+        <div class="prog-bar" style="height:8px"><div class="prog-fill" style="width:${pct}%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+        <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+          ${config.statuses.map(s=>{const c=games.filter(g=>g.status===s).length;if(!c)return '';const dot=STATUS_DOT[s]||'#5a5a7a';return `<div style="font-size:11px;color:var(--fg2);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${dot};display:inline-block"></span>${s}: <strong style="color:var(--fg)">${c}</strong></div>`;}).join('')}
+        </div>
+      </div>`;
+    }
+    default:return '';
+  }
+}
+
+function buildGameListWidget(list){
+  if(!list.length)return `<div class="empty-state" style="padding:24px 0"><p style="font-size:12px">Nenhum jogo aqui ainda</p></div>`;
+  return `<div class="games-list-widget">${list.map(g=>{const dot=STATUS_DOT[g.status]||'#5a5a7a';return `<div class="game-list-row" onclick="editGame('${g.id}')"><img class="game-list-cover" src="${g.cover||ph()}" onerror="this.src='${ph()}'" alt="${g.name}"><div class="game-list-info"><div class="game-list-name">${g.name}</div><div class="game-list-meta">${g.platform||'—'} · ${g.hours?g.hours+'h':'—'}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"><span style="width:8px;height:8px;border-radius:50%;background:${dot}"></span>${g.rating?`<span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--gold)">${g.rating}/10</span>`:''}</div></div>`;}).join('')}</div>`;
+}
+
+const CC=['#7c6aff','#22d994','#f5c842','#4ab3f4','#ff5572','#ff8c42','#f472b6','#a78bfa','#34d399','#fbbf24'];
+function drawChart(id){
+  destroyChart(id);
+  const canvas=document.getElementById('canvas-'+id);if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const base={responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#9090b0',font:{size:11,family:'Inter'}}}}};
+  if(id==='chart-status'){
+    const c={};config.statuses.forEach(s=>{c[s]=0;});games.forEach(g=>{if(g.status)c[g.status]=(c[g.status]||0)+1;});
+    const lbl=Object.keys(c).filter(k=>c[k]>0);
+    charts[id]=new Chart(ctx,{type:'doughnut',data:{labels:lbl,datasets:[{data:lbl.map(k=>c[k]),backgroundColor:CC,borderColor:'#0f0f1a',borderWidth:2}]},options:{...base,cutout:'65%'}});
+  } else if(id==='chart-genre'){
+    const c={};games.forEach(g=>{if(g.genre)c[g.genre]=(c[g.genre]||0)+1;});
+    const s=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    charts[id]=new Chart(ctx,{type:'bar',data:{labels:s.map(x=>x[0]),datasets:[{data:s.map(x=>x[1]),backgroundColor:'rgba(124,106,255,0.7)',borderColor:'rgba(124,106,255,1)',borderWidth:1,borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9090b0'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#9090b0',font:{size:10}},grid:{display:false}}}}});
+  } else if(id==='chart-hours'){
+    const c={};games.forEach(g=>{if(g.platform&&g.hours)c[g.platform]=(c[g.platform]||0)+g.hours;});
+    const s=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    charts[id]=new Chart(ctx,{type:'bar',data:{labels:s.map(x=>x[0]),datasets:[{data:s.map(x=>x[1]),backgroundColor:'rgba(34,217,148,0.7)',borderColor:'rgba(34,217,148,1)',borderWidth:1,borderRadius:4,label:'Horas'}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9090b0'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#9090b0',font:{size:10}},grid:{display:false}}}}});
+  } else if(id==='chart-rating'){
+    const b=Array(10).fill(0);games.forEach(g=>{if(g.rating)b[g.rating-1]++;});
+    charts[id]=new Chart(ctx,{type:'bar',data:{labels:['1','2','3','4','5','6','7','8','9','10'],datasets:[{data:b,backgroundColor:b.map((_,i)=>{const t=i/9;return `rgba(${Math.round(255-t*33)},${Math.round(85+t*132)},${Math.round(114-t*42)},0.75)`;}),borderWidth:0,borderRadius:4,label:'Jogos'}]},options:{...base,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9090b0'},grid:{display:false}},y:{ticks:{color:'#9090b0',stepSize:1},grid:{color:'rgba(255,255,255,0.05)'}}}}});
+  }
+}
+
+function openWidgetPicker(){renderWidgetPicker();document.getElementById('widget-picker-modal').classList.add('open');}
+function closeWidgetPicker(){document.getElementById('widget-picker-modal').classList.remove('open');}
+function renderWidgetPicker(){
+  document.getElementById('widget-picker-grid').innerHTML=Object.entries(WIDGET_DEFS).map(([id,def])=>{
+    const added=dashLayout.includes(id);
+    return `<div class="wp-item${added?' added':''}" onclick="${added?'':'addWidget(\''+id+'\')'}"><div class="wp-icon">${def.icon}</div><div class="wp-name">${def.name}</div><div class="wp-desc">${added?'✓ Ativo':def.desc}</div></div>`;
+  }).join('');
+}
+
+// LIBRARY
+function setFilter(f){currentFilter=f;document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.filter===f));renderLibrary();}
+function setView(v){currentView=v;document.getElementById('view-grid-btn').classList.toggle('active',v==='grid');document.getElementById('view-table-btn').classList.toggle('active',v==='table');renderLibrary();}
+function renderFilters(){
+  const fc=document.getElementById('filter-chips');
+  fc.innerHTML=`<button class="chip${currentFilter==='all'?' active':''}" data-filter="all" onclick="setFilter('all')">Todos</button>`+config.statuses.map(s=>`<button class="chip${currentFilter===s?' active':''}" data-filter="${s}" onclick="setFilter('${s.replace(/'/g,"\\'")}')">${s}</button>`).join('');
+}
+function renderLibrary(){
+  const list=getFiltered(),cnt=document.getElementById('library-content');
+  if(!list.length){cnt.innerHTML=`<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/></svg><p>Nenhum jogo encontrado</p></div>`;return;}
+  cnt.innerHTML=currentView==='grid'?`<div class="games-grid">${list.map(gameCardHTML).join('')}</div>`:tableHTML(list);
+}
+function gameCardHTML(g){
+  const pl=getPlatform(g.platform),sbcls=STATUS_CSS[g.status]||'s-inactive';
+  return `<div class="game-card" onclick="editGame('${g.id}')"><div class="cover-wrap"><img class="game-card-cover" src="${g.cover||ph()}" alt="${g.name}" onerror="this.src='${ph()}'"><div class="cover-gradient"></div><div class="card-status"><span class="sbadge ${sbcls}">${g.status}</span></div>${g.rating?`<div class="card-rating">★ ${g.rating}</div>`:''}<div class="cover-info"><div class="gname">${g.name}</div><div class="ggenre">${g.genre||'—'}</div></div></div><div class="card-footer"><div class="plat">${pl.icon?`<img src="${pl.icon}" onerror="this.style.display='none'" alt="">`:''}<span>${g.platform||'—'}</span></div><div class="hours">${g.hours?g.hours+'h':'—'}</div></div>${g.rating?`<div style="padding:0 10px 8px"><div class="mini-rbar"><div class="mini-rfill" style="width:${g.rating*10}%"></div></div></div>`:''}</div>`;
+}
+function tableHTML(list){
+  return `<div style="overflow-x:auto"><table class="games-table"><thead><tr><th>Capa</th><th>Nome</th><th>Status</th><th>Plataforma</th><th>Gênero</th><th>Horas</th><th>Nota</th><th>Lançamento</th></tr></thead><tbody>${list.map(g=>`<tr onclick="editGame('${g.id}')"><td><img class="tbl-cover" src="${g.cover||ph()}" onerror="this.src='${ph()}'" alt="${g.name}"></td><td style="font-weight:500;min-width:140px">${g.name}</td><td>${getStatusBadge(g.status||'—')}</td><td>${g.platform||'—'}</td><td>${g.genre||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${g.hours?g.hours+'h':'—'}</td><td style="color:var(--gold);font-family:'JetBrains Mono',monospace">${g.rating?g.rating+'/10':'—'}</td><td style="color:var(--fg2)">${fmtDate(g.release)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// FORM
+function populateSelects(){
+  ['g-genre','g-platform','g-status'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const arr=id==='g-genre'?config.genres:id==='g-platform'?config.platforms.map(p=>p.name):config.statuses;
+    el.innerHTML='<option value="">Selecione...</option>'+arr.map(v=>`<option value="${v}">${v}</option>`).join('');
+  });
+}
+let coverInputMode='url';
+function switchCoverTab(t){coverInputMode=t;document.getElementById('ctab-url').style.display=t==='url'?'block':'none';document.getElementById('ctab-file').style.display=t==='file'?'block':'none';document.querySelectorAll('.ctab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='url')||(i===1&&t==='file')));}
+function previewCoverUrl(){const v=document.getElementById('cover-url').value.trim();if(v){document.getElementById('cover-data').value=v;showCoverPreview(v);}else clearCoverPreview();}
+function showCoverPreview(src){document.getElementById('cover-preview').src=src;document.getElementById('cover-preview-box').classList.add('show');}
+function clearCoverPreview(){document.getElementById('cover-preview-box').classList.remove('show');document.getElementById('cover-preview').src='';document.getElementById('cover-data').value='';document.getElementById('cover-url').value='';document.getElementById('cover-file').value='';}
+function handleCoverUpload(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{document.getElementById('cover-data').value=ev.target.result;showCoverPreview(ev.target.result);};r.readAsDataURL(f);}
+
+function openGameModal(){populateSelects();document.getElementById('edit-id').value='';document.getElementById('modal-title').textContent='Adicionar Jogo';['g-name','g-hours','g-notes'].forEach(i=>document.getElementById(i).value='');['g-genre','g-platform','g-status'].forEach(i=>document.getElementById(i).value='');document.getElementById('g-rating').value=5;document.getElementById('rval').textContent='5';document.getElementById('g-release').value='';document.getElementById('delete-action').style.display='none';clearCoverPreview();switchCoverTab('url');document.getElementById('game-modal').classList.add('open');}
+function closeGameModal(){document.getElementById('game-modal').classList.remove('open');}
+function editGame(id){
+  const g=games.find(x=>x.id===id);if(!g)return;
+  populateSelects();
+  document.getElementById('edit-id').value=id;document.getElementById('modal-title').textContent='Editar Jogo';
+  document.getElementById('g-name').value=g.name||'';document.getElementById('g-genre').value=g.genre||'';document.getElementById('g-platform').value=g.platform||'';document.getElementById('g-status').value=g.status||'';document.getElementById('g-hours').value=g.hours||'';document.getElementById('g-rating').value=g.rating||5;document.getElementById('rval').textContent=g.rating||5;document.getElementById('g-release').value=g.release||'';document.getElementById('g-notes').value=g.notes||'';
+  document.getElementById('delete-action').style.display='block';
+  if(g.cover){document.getElementById('cover-data').value=g.cover;showCoverPreview(g.cover);if(g.cover.startsWith('http')){document.getElementById('cover-url').value=g.cover;switchCoverTab('url');}else switchCoverTab('file');}
+  else{clearCoverPreview();switchCoverTab('url');}
+  document.getElementById('game-modal').classList.add('open');
+}
+async function saveGame(){
+  const name=document.getElementById('g-name').value.trim();if(!name){toast('Digite o nome do jogo!','error');return;}
+  const cover=document.getElementById('cover-url').value.trim()||document.getElementById('cover-data').value;
+  const gd={name,cover:cover||'',genre:document.getElementById('g-genre').value,platform:document.getElementById('g-platform').value,status:document.getElementById('g-status').value,hours:parseInt(document.getElementById('g-hours').value)||null,rating:parseInt(document.getElementById('g-rating').value)||null,release:document.getElementById('g-release').value||null,notes:document.getElementById('g-notes').value||null,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  const eid=document.getElementById('edit-id').value;
+  if(eid){const idx=games.findIndex(x=>x.id===eid);if(idx!==-1)games[idx]={...games[idx],...gd};await saveGame_db(gd,eid);toast('Jogo atualizado!');}
+  else{const newId=await saveGame_db(gd);if(newId)games.unshift({id:newId,...gd});toast('Jogo adicionado!');}
+  closeGameModal();render();
+}
+function askDeleteGame(){deleteGameId=document.getElementById('edit-id').value;document.getElementById('del-modal').classList.add('open');}
+function closeDel(){document.getElementById('del-modal').classList.remove('open');deleteGameId=null;}
+async function confirmDelete(){if(deleteGameId){games=games.filter(g=>g.id!==deleteGameId);await deleteGame_db(deleteGameId);toast('Jogo excluído!');render();}closeDel();closeGameModal();}
+
+// SETTINGS
+function openSettings(){renderCfgLists();document.getElementById('settings-modal').classList.add('open');}
+function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
+function renderCfgLists(){
+  document.getElementById('cfg-genres').innerHTML=config.genres.map(g=>`<div class="cfg-item"><span>${g}</span><button class="cfg-del" onclick="removeCfg('genres','${g.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
+  document.getElementById('cfg-platforms').innerHTML=config.platforms.map(p=>`<div class="cfg-item"><div class="cfg-left">${p.icon?`<img src="${p.icon}" onerror="this.style.display='none'" alt="">`:''}<span>${p.name}</span></div><button class="cfg-del" onclick="removeCfg('platforms','${p.name.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
+  document.getElementById('cfg-statuses').innerHTML=config.statuses.map(s=>`<div class="cfg-item"><span>${s}</span><button class="cfg-del" onclick="removeCfg('statuses','${s.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
+}
+function addGenre(){const v=document.getElementById('new-genre').value.trim();if(!v||config.genres.includes(v)){toast(v?'Já existe!':'Digite um gênero','error');return;}config.genres.push(v);document.getElementById('new-genre').value='';afterCfgChange('genres');}
+function addPlatform(){const name=document.getElementById('new-plat-name').value.trim(),icon=document.getElementById('new-plat-icon').value.trim();if(!name){toast('Nome obrigatório!','error');return;}const i=config.platforms.findIndex(p=>p.name===name);if(i!==-1)config.platforms[i].icon=icon;else config.platforms.push({name,icon});document.getElementById('new-plat-name').value='';document.getElementById('new-plat-icon').value='';afterCfgChange('platforms');}
+function addStatus(){const v=document.getElementById('new-status').value.trim();if(!v||config.statuses.includes(v)){toast(v?'Já existe!':'Digite um status','error');return;}config.statuses.push(v);document.getElementById('new-status').value='';afterCfgChange('statuses');}
+function removeCfg(type,val){if(type==='platforms')config.platforms=config.platforms.filter(p=>p.name!==val);else config[type]=config[type].filter(x=>x!==val);afterCfgChange(type);}
+function afterCfgChange(type){saveUserMeta();renderCfgLists();populateSelects();if(type==='statuses')renderFilters();toast('Configuração salva!');}
+
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o){if(o.id==='game-modal')closeGameModal();else if(o.id==='del-modal')closeDel();else if(o.id==='widget-picker-modal')closeWidgetPicker();else if(o.id==='settings-modal')closeSettings();}}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeGameModal();closeDel();closeWidgetPicker();closeSettings();}});
+</script>
 </body>
 </html>
